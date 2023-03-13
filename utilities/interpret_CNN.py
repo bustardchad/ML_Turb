@@ -71,7 +71,7 @@ def confusion(config, model, data_loader):
 import cmasher as cmr
 import random
 
-def saliency(image, sigma = 4.0):
+def saliency(image, model, sigma = 4.0):
     # Requires: image, sigma = standard deviation for gaussian smoothing
 
     # Steps to make a saliency map
@@ -164,7 +164,7 @@ def occlusion(model, image, label, occ_size = 50, occ_stride = 50, occ_pixel = 0
     return heatmap
 
 
-def plot_saliency(config, data_loader, n_examples = 6, n_classes = 2, levels = [0.6]):
+def plot_saliency(config, model, data_loader, n_examples = 6, n_classes = 2, levels = [0.6]):
     # Plots saliency maps for each class, with n_examples per class.
     # levesl = saliency contours with values from 0 to 1, e.g. levels = [0.4, 0.6]
 
@@ -179,7 +179,7 @@ def plot_saliency(config, data_loader, n_examples = 6, n_classes = 2, levels = [
     for i in range(0,n_classes):
         images_to_plot = images[labels==i]
         for j in range(0,n_examples):
-            plt_image, filtered_saliency = saliency(images_to_plot[j],i)
+            plt_image, filtered_saliency = saliency(images_to_plot[j], model, i)
             # normalize the saliency by its max and plot only one or two levels in the middle range
             filtered_saliency = filtered_saliency/np.max(filtered_saliency)
             axs[i,j].imshow(plt_image,cmap='gray')
