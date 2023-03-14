@@ -179,11 +179,11 @@ def plot_saliency(config, model, data_loader, n_examples = 6, n_classes = 2, lev
     for i in range(0,n_classes):
         images_to_plot = images[labels==i]
         for j in range(0,n_examples):
-            plt_image, filtered_saliency = saliency(images_to_plot[j], model, i)
+            plt_image, filtered_saliency = saliency(images_to_plot[j], model, sigma=4.0)
             # normalize the saliency by its max and plot only one or two levels in the middle range
             filtered_saliency = filtered_saliency/np.max(filtered_saliency)
             axs[i,j].imshow(plt_image,cmap='gray')
-            axs[i,j].contour(filtered_saliency,cmap='plasma_r', levels=[0.6], linewidths = 2)
+            axs[i,j].contour(filtered_saliency,cmap='plasma_r', levels=levels, linewidths = 2)
 
     cols = ['Example {}'.format(col) for col in range(1, n_examples+1)]
     rows = config.fileDirArr
