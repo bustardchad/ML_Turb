@@ -28,7 +28,7 @@ import pandas as pd
 
 def pre_processing(fileDir, field, killPwr=False, cuts = 5):
     # access data from FITS file
-    fulldata = fits.open('Files/'+fileDir + '/turb_full_multiple_times.fits')
+    fulldata = fits.open('../Files/'+fileDir + '/turb_full_multiple_times.fits')
 
     # data is logarithmic, so take the log
     data = np.log10(fulldata[field].data)
@@ -42,15 +42,17 @@ def pre_processing(fileDir, field, killPwr=False, cuts = 5):
     newdata = data
 
     # hardcoded image size, # of images in each direction, striding (for further augmentation)
-    imsize, nx, nsh = 128, 4, 1
-    sh = imsize / nsh  # stride size
+    imsize, nx, nsh = 128, 4, 2
     dsh = data.shape
 
 
     # create data cube that will hold all slices
+    # only training data has the augmentation (if nsh > 1)
     train_data = np.zeros([imsize, imsize, int((dsh[2]/cuts) * nsh * nsh * nx * nx)])
-    val_data = np.zeros([imsize, imsize, int((dsh[2]/cuts) * nsh * nsh * nx * nx)])
-    test_data = np.zeros([imsize, imsize, int((dsh[2]/cuts) * nsh * nsh * nx * nx)])
+    #val_data = np.zeros([imsize, imsize, int((dsh[2]/cuts) * nsh * nsh * nx * nx)])
+    #test_data = np.zeros([imsize, imsize, int((dsh[2]/cuts) * nsh * nsh * nx * nx)])
+    val_data = np.zeros([imsize, imsize, int((dsh[2]/cuts) * nx * nx)])
+    test_data = np.zeros([imsize, imsize, int((dsh[2]/cuts) * nx * nx)])
 
     iterct_train = 0
     iterct_val = 0
@@ -68,8 +70,14 @@ def pre_processing(fileDir, field, killPwr=False, cuts = 5):
 
     # newdata holds the full set of slices, now we want to split into training and test sets
     for s in tqdm(np.arange(dsh[0])):
-        for r in np.arange(nsh):  # two loops that shift the image (augmentation)
-            for q in np.arange(nsh):
+        if (s < (dsh[2]/cuts)-1): # only do augmentation on training data
+            aug = nsh
+        else:
+            aug = 1
+
+        sh = imsize / aug  # stride size depends on if we are augmenting
+        for r in np.arange(aug):  # two loops that shift the image (augmentation)
+            for q in np.arange(aug):
                 fullimg = np.roll(np.roll(newdata[s, :, :], int(
                     r * sh + s), axis=0), int(q * sh + s), axis=1)
                 for i in np.arange(nx):  # two loops that scan acros the 16 128 x 128 images
@@ -111,14 +119,14 @@ def plot_random_slices(data):
 # fromHDF5_to_cube.py)
 #fileDirMHD_arr = ['MHD_beta1', 'MHD_beta10', 'MHD_beta100' ,'CR_Advect_beta10', 'CR_Diff_Fiducial_beta10','CR_Diff100_beta10']
 fileDirMHD_arr = ['MHD_beta1','MHD_beta10','MHD_beta100','CR_Advect_beta10','CR_Diff_Fiducial_beta10','CR_Diff100_beta10']
-field_list = ['density','magnetic_energy_density']
+field_list = ['density']
 
 # also for sims with CRs, etc.
 # fileDirC_arr = ['Files/MHD_beta1/']
 
 
 # Start creating images!
-killPwr = True
+killPwr = False
 
 for fileDir in fileDirMHD_arr:
     # preprocessing steps
@@ -133,11 +141,11 @@ for fileDir in fileDirMHD_arr:
 
         # Save files
         if killPwr:
-            np.save('Kill_Power/'+fileDir + f"/train_{sim_name}_{field}_killPwr_noAugment.npy", train_data)
-            np.save('Kill_Power/'+fileDir + f"/val_{sim_name}_{field}_killPwr_noAugment.npy", val_data)
-            np.save('Kill_Power/'+fileDir + f"/test_{sim_name}_{field}_killPwr_noAugment.npy", test_data)
+            np.save('../Kill_Power/'+fileDir + f"/train_{sim_name}_{field}_killPwr.npy", train_data)
+           # np.save('Kill_Power/'+fileDir + f"/val_{sim_name}_{field}_killPwr_noAugment.npy", val_data)
+           # np.save('Kill_Power/'+fileDir + f"/test_{sim_name}_{field}_killPwr_noAugment.npy", test_data)
         else:
-            np.save('Full_Power/'+fileDir + f"/train_{sim_name}_{field}_noAugment.npy", train_data)
-            np.save('Full_Power/'+fileDir + f"/val_{sim_name}_{field}_noAugment.npy", val_data)
-            np.save('Full_Power/'+fileDir + f"/test_{sim_name}_{field}_noAugment.npy", test_data)
+            np.save('../Full_Power/'+fileDir + f"/train_{sim_name}_{field}.npy", train_data)
+           # np.save('Full_Power/'+fileDir + f"/val_{sim_name}_{field}_noAugment.npy", val_data)
+           # np.save('Full_Power/'+fileDir + f"/test_{sim_name}_{field}_noAugment.npy", test_data)
 

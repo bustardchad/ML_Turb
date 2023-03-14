@@ -181,13 +181,15 @@ def load_presplit_files(config):
         y_test_full = []
         lbl = 0
         for fileDir in fileDirArr:
-            filename_train = f"/train_{fileDir}_{field}_noAugment.npy"
+            #filename_train = f"/train_{fileDir}_{field}_noAugment.npy"
+            filename_train = f"/train_{fileDir}_{field}.npy"
             filename_val = f"/val_{fileDir}_{field}_noAugment.npy"
             filename_test = f"/test_{fileDir}_{field}_noAugment.npy"
 
             dir = 'Full_Power/'
             if config.killPwr: # use images where power spectra are flattened
-                filename_train = f"/train_{fileDir}_{field}_killPwr_noAugment.npy"
+                #filename_train = f"/train_{fileDir}_{field}_killPwr_noAugment.npy"
+                filename_train = f"/train_{fileDir}_{field}_killPwr.npy"
                 filename_val = f"/val_{fileDir}_{field}_killPwr_noAugment.npy"
                 filename_test = f"/test_{fileDir}_{field}_killPwr_noAugment.npy"
                 dir = 'Kill_Power/'
