@@ -167,7 +167,7 @@ def reformat(x_full, y_full):
 #         field_list -- list of fields
 #         Options are: density, magnetic_energy_density, alfven_speed
 #         e.g. field_list = ['density']
-def load_presplit_files(config):
+def load_presplit_files(config,augment=False):
     fileDirArr = config.fileDirArr
     field_list = config.field_list
     # For a given field...
@@ -182,16 +182,26 @@ def load_presplit_files(config):
         lbl = 0
         for fileDir in fileDirArr:
             #filename_train = f"/train_{fileDir}_{field}_noAugment.npy"
-            filename_train = f"/train_{fileDir}_{field}.npy"
+            if augment:
+                filename_train = f"/train_{fileDir}_{field}.npy"
+            else:
+                filename_train = f"/train_{fileDir}_{field}_noAugment.npy"
+
             filename_val = f"/val_{fileDir}_{field}_noAugment.npy"
             filename_test = f"/test_{fileDir}_{field}_noAugment.npy"
 
             dir = 'Full_Power/'
+
             if config.killPwr: # use images where power spectra are flattened
                 #filename_train = f"/train_{fileDir}_{field}_killPwr_noAugment.npy"
-                filename_train = f"/train_{fileDir}_{field}_killPwr.npy"
+                if augment:
+                    filename_train = f"/train_{fileDir}_{field}_killPwr.npy"
+                else:
+                    filename_train = f"/train_{fileDir}_{field}_killPwr_noAugment.npy"
+
                 filename_val = f"/val_{fileDir}_{field}_killPwr_noAugment.npy"
                 filename_test = f"/test_{fileDir}_{field}_killPwr_noAugment.npy"
+
                 dir = 'Kill_Power/'
 
             x_train = np.load(dir + fileDir + filename_train, mmap_mode='c') # the images
@@ -371,8 +381,8 @@ def load_presplit_files_unet(config):
 
 # loads files assuming they are pre-split into training, validation, and test sets
 # returns DataTensors for each split
-def preprocess(config):
-    train_data, val_data, test_data = load_presplit_files(config)
+def preprocess(config,augment=False):
+    train_data, val_data, test_data = load_presplit_files(config,augment)
 
     # create DataLoaders
     train_dl, valid_dl, test_dl = create_data_loaders(config, train_data,
