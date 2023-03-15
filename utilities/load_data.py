@@ -37,7 +37,14 @@ def download_data(config):
         gdown.download_folder(url)
 
 
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
 
+def batch_imshow(img, title):
+    plt.figure(figsize=(10, 10))
+    plt.title(title)
+    plt.imshow(np.transpose( img.detach().cpu().numpy(), (1, 2, 0)), cmap='gray')
+    plt.show()
 
 # TODO: Put bar labels in correct positions -- doesn't work right now
 # Plot histogram showing data distribution by class
@@ -64,44 +71,47 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
     valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 4, pin_memory = True)
     test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 4, pin_memory = True)
 
+    """
     for i, data in enumerate(train_dl):
-        print(data.shape)
         if (config.sim_type == 'classify'):
             x, y = data
             imshow(make_grid(x, 8), title = 'Sample batch')
         elif (config.sim_type == 'unet'):
-            x, y = data
+            print("Unet")
+            x, y, z = data
+            print(x.shape)
+            print(y.shape)
+            print(z.shape)
             batch_imshow(make_grid(x, 8), title = 'Sample input batch')
             batch_imshow(make_grid(y, 8), title = 'Sample output batch')
         break  # we need just one batch
-
+    """
     # Optionally check that the training, validation, and test sets have comparable
     # class representation
+    """
     if check_representation:
+        labels_train = []
+        labels_valid = []
+        labels_test = []
+
         if (config.sim_type == 'classify'):
-            labels_train = []
             for images, labels in train_dl:
                 labels_train.extend(labels)
 
-            labels_valid = []
             for images, labels in valid_dl:
                 labels_valid.extend(labels)
 
-            labels_test = []
             for images, labels in test_dl:
                 labels_test.extend(labels)
 
         elif (config.sim_type=='unet'):
-            labels_train = []
-            for images_in, images_out,labels in train_dl:
+            for data, labels in train_dl:
                 labels_train.extend(labels)
 
-            labels_valid = []
-            for images_in, images_out, labels in valid_dl:
+            for data, labels in valid_dl:
                 labels_valid.extend(labels)
 
-            labels_test = []
-            for images_in, images_out, labels in test_dl:
+            for data, labels in test_dl:
                 labels_test.extend(labels)
 
         plt.hist(labels_train)
@@ -118,7 +128,7 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
         plt.title("test data")
         plt.xlabel("label")
         plt.show()
-
+    """
 
     return train_dl, valid_dl, test_dl
 
@@ -257,6 +267,7 @@ def imshow(img, title):
 
 def add_labels_unet(x, x_full, y, y_full, z_full, lbl):
     x = np.float32(x)
+    y = np.float32(y)
 
     # assign a class value to each image depending on which simulation it came from
     # (e.g. 0 for beta = 1, 1 for beta = 10, 2 for beta = 100)
@@ -395,9 +406,9 @@ def load_presplit_files_unet(config,augment=False):
 
 
     # Combine into TensorDataset
-    train_full = TensorDataset(x_train_with_channel,y_train_with_channel)
-    val_full = TensorDataset(x_val_with_channel, y_val_with_channel)
-    test_full = TensorDataset(x_test_with_channel, y_test_with_channel)
+    train_full = TensorDataset(x_train_with_channel,y_train_with_channel, z_train_full)
+    val_full = TensorDataset(x_val_with_channel, y_val_with_channel, z_val_full)
+    test_full = TensorDataset(x_test_with_channel, y_test_with_channel, z_test_full)
 
     return train_full, val_full, test_full
 
@@ -418,7 +429,7 @@ def preprocess(config,augment=False):
         # create DataLoaders
         train_dl, valid_dl, test_dl = create_data_loaders(config, train_data,
                                                       val_data, test_data,
-                                                      check_representation=True)
+                                                      check_representation=False)
     return train_dl, valid_dl, test_dl
 
 
