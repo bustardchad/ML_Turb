@@ -65,11 +65,12 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
     test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 4, pin_memory = True)
 
     for i, data in enumerate(train_dl):
+        print(data.shape)
         if (config.sim_type == 'classify'):
             x, y = data
             imshow(make_grid(x, 8), title = 'Sample batch')
         elif (config.sim_type == 'unet'):
-            x, y, z = data
+            x, y = data
             batch_imshow(make_grid(x, 8), title = 'Sample input batch')
             batch_imshow(make_grid(y, 8), title = 'Sample output batch')
         break  # we need just one batch
@@ -281,7 +282,7 @@ def add_channel(x_full):
 
     return x_with_channel
 
-def load_presplit_files_unet(config):
+def load_presplit_files_unet(config,augment=False):
     fileDirArr = config.fileDirArr
     field_list = config.field_list
     # For a given field...
@@ -302,27 +303,46 @@ def load_presplit_files_unet(config):
     lbl = 0
 
     for fileDir in fileDirArr:
-        filename_train0 = f"/train_{fileDir}_{field0}_noAugment.npy"
+        if augment:
+            filename_train0 = f"/train_{fileDir}_{field0}.npy"
+        else:
+            filename_train0 = f"/train_{fileDir}_{field0}_noAugment.npy"
+
         filename_val0 = f"/val_{fileDir}_{field0}_noAugment.npy"
         filename_test0 = f"/test_{fileDir}_{field0}_noAugment.npy"
 
-        filename_train1 = f"/train_{fileDir}_{field1}_noAugment.npy"
+        if augment:
+            filename_train1 = f"/train_{fileDir}_{field1}.npy"
+        else:
+            filename_train1 = f"/train_{fileDir}_{field1}_noAugment.npy"
+
         filename_val1 = f"/val_{fileDir}_{field1}_noAugment.npy"
         filename_test1 = f"/test_{fileDir}_{field1}_noAugment.npy"
 
         dir = 'Full_Power/'
 
         if config.killPwr: # use images where power spectra are flattened
-            filename_train0 = f"/train_{fileDir}_{field0}_killPwr_noAugment.npy"
+            if augment:
+                filename_train0 = f"/train_{fileDir}_{field0}_killPwr.npy"
+            else:
+                filename_train0 = f"/train_{fileDir}_{field0}_killPwr_noAugment.npy"
+
             filename_val0 = f"/val_{fileDir}_{field0}_killPwr_noAugment.npy"
             filename_test0 = f"/test_{fileDir}_{field0}_killPwr_noAugment.npy"
 
-            filename_train1 = f"/train_{fileDir}_{field1}_killPwr_noAugment.npy"
+            if augment:
+                filename_train1 = f"/train_{fileDir}_{field1}_killPwr.npy"
+            else:
+                filename_train1 = f"/train_{fileDir}_{field1}_killPwr_noAugment.npy"
+
             filename_val1 = f"/val_{fileDir}_{field1}_killPwr_noAugment.npy"
             filename_test1 = f"/test_{fileDir}_{field1}_killPwr_noAugment.npy"
 
             dir = 'Kill_Power/'
 
+        print("Training filenames:")
+        print(filename_train0)
+        print(filename_train1)
         x_train = np.load(dir + fileDir + filename_train0, mmap_mode='c') # the images
         x_val = np.load(dir + fileDir + filename_val0, mmap_mode='c') # the images
         x_test = np.load(dir + fileDir + filename_test0, mmap_mode='c') # the images
@@ -365,30 +385,40 @@ def load_presplit_files_unet(config):
     x_test_with_channel = add_channel(x_test_full)
     y_test_with_channel = add_channel(y_test_full)
 
+    z_train_full = torch.from_numpy(z_train_full)
+    z_train_full = z_train_full.type(torch.LongTensor) # throws error unless label is a LongTensor (64)
+    z_val_full = torch.from_numpy(z_val_full)
+    z_val_full = z_val_full.type(torch.LongTensor) # throws error unless label is a LongTensor (64)
+    z_test_full = torch.from_numpy(z_test_full)
+    z_test_full = z_test_full.type(torch.LongTensor) # throws error unless label is a LongTensor (64)
 
-    if (len(field_list) == 1):
-        #plot_data(labels_train.numpy(),fileDirArr) # show distribution of data
-        #plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
-        #plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
 
-     # Combine into TensorDataset
-     train_full = TensorDataset(x_train_with_channel,y_train_with_channel, z_train_full)
-     val_full = TensorDataset(x_val_with_channel, y_val_with_channel, z_val_full)
-     test_full = TensorDataset(x_test_with_channel, y_test_with_channel, z_test_full)
 
-     return train_full, val_full, test_full
+    # Combine into TensorDataset
+    train_full = TensorDataset(x_train_with_channel,y_train_with_channel)
+    val_full = TensorDataset(x_val_with_channel, y_val_with_channel)
+    test_full = TensorDataset(x_test_with_channel, y_test_with_channel)
+
+    return train_full, val_full, test_full
 
 
 # loads files assuming they are pre-split into training, validation, and test sets
 # returns DataTensors for each split
 def preprocess(config,augment=False):
-    train_data, val_data, test_data = load_presplit_files(config,augment)
+    if (config.sim_type=='classify'):
+        train_data, val_data, test_data = load_presplit_files(config,augment)
 
-    # create DataLoaders
-    train_dl, valid_dl, test_dl = create_data_loaders(config, train_data,
+        # create DataLoaders
+        train_dl, valid_dl, test_dl = create_data_loaders(config, train_data,
                                                       val_data, test_data,
                                                       check_representation=True)
+    elif (config.sim_type=='unet'):
+        train_data, val_data, test_data = load_presplit_files_unet(config,augment)
 
+        # create DataLoaders
+        train_dl, valid_dl, test_dl = create_data_loaders(config, train_data,
+                                                      val_data, test_data,
+                                                      check_representation=True)
     return train_dl, valid_dl, test_dl
 
 
