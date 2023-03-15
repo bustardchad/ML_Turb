@@ -332,6 +332,7 @@ def load_presplit_files_unet(config,augment=False):
 
         dir = 'Full_Power/'
 
+
         if config.killPwr: # use images where power spectra are flattened
             if augment:
                 filename_train0 = f"/train_{fileDir}_{field0}_killPwr.npy"
@@ -350,6 +351,9 @@ def load_presplit_files_unet(config,augment=False):
             filename_test1 = f"/test_{fileDir}_{field1}_killPwr_noAugment.npy"
 
             dir = 'Kill_Power/'
+
+        if config.run_colab:
+            dir = config.path_to_dir
 
         print("Training filenames:")
         print(filename_train0)
