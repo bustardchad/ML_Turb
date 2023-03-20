@@ -1,5 +1,17 @@
 # Functions that help download, load data files, and convert to DataLoaders
-# Input: config
+#
+# Input:  config with the following parameters:
+#          sim_type = 'unet' or 'classify'
+#          batch_size = 64
+#          fileDirArr = ['MHD_beta10'] -- file directories
+#          field_list = ['density','magnetic_energy_density'] -- fields to load
+#          data_presplit = True -- flag for whether data has already been split into training, val, test
+#          killPwr = False -- whether we should load data with power spectra flattened or not
+#          run_locally = True -- only set to True if running on my local computer
+#          run_colab = False -- set to true if running on Google Colab
+#          use_transforms = False -- if True, augment data with horizontal and vertical flips
+#          path_to_dir = '../' -- should be set to '' if Full_Power or Kill_Power directories are in same folder as this script
+#
 # Output: DataLoaders for training, validation, and test sets
 #           i.e. train_dl, valid_dl, test_dl
 
@@ -10,10 +22,43 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data.dataloader import DataLoader
-from torch.utils.data import TensorDataset, random_split
+from torch.utils.data import Dataset, TensorDataset, random_split
+import torchvision.transforms as T
 import pdb
 import os
 import gdown
+
+
+class CustomDataset(Dataset):
+    """TensorDataset that supports transforms for both input and target images
+    """
+    def __init__(self, inputs, labels, transform=None):
+        self.inputs = inputs
+        self.labels = labels
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = self.inputs[0][index]
+        y = self.inputs[1][index]
+        z = self.labels[index]
+
+        if not np.any(x.numpy() > 0): # skip the images that are blank
+            rep_index = np.random.randint(0, 8)
+            return self.__getitem__(rep_index)
+        #assert np.any(x.numpy() > 0), "Error: input image is blank"
+        #assert np.any(y.numpy() > 0), "Error: target image is blank"
+
+        if self.transform:
+            x = self.transform(x)
+            y = self.transform(y)
+
+
+        return x, y, z
+
+    def __len__(self):
+        return self.inputs[0].size(0)
+
+
 
 # downloads data folder at URL
 def download_data(config):
@@ -67,9 +112,9 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
     batch_size=config.batch_size
 
     #load the train and validation into batches.
-    train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 4, pin_memory = True)
-    valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 4, pin_memory = True)
-    test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 4, pin_memory = True)
+    train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+    valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
+    test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
 
     """
     for i, data in enumerate(train_dl):
@@ -168,6 +213,28 @@ def reformat(x_full, y_full):
     return x_with_channel, y_full
 
 
+def add_transforms(tensors,labels):
+    horiz = T.Compose([
+            T.ToPILImage(),
+            T.RandomHorizontalFlip(1.0),
+            T.ToTensor()
+            ])
+
+    vert = T.Compose([
+            T.ToPILImage(),
+            T.RandomVerticalFlip(1.0),
+            T.ToTensor()
+            ])
+
+
+    # Combine into TensorDataset
+    no_transforms = CustomDataset(tensors,labels,transform=None)
+    horiz_transforms = CustomDataset(tensors,labels,transform=horiz)
+    vert_transforms = CustomDataset(tensors,labels,transform=vert)
+
+    full_dataset = torch.utils.data.ConcatDataset([no_transforms, horiz_transforms, vert_transforms])
+
+    return full_dataset
 
 
 # Inputs: fileDirArr -- files.
@@ -201,7 +268,7 @@ def load_presplit_files(config,augment=False):
             filename_val = f"/val_{fileDir}_{field}_noAugment.npy"
             filename_test = f"/test_{fileDir}_{field}_noAugment.npy"
 
-            dir = 'Full_Power/'
+            dir = config.path_to_dir + 'Full_Power/'
 
             if config.killPwr: # use images where power spectra are flattened
                 #filename_train = f"/train_{fileDir}_{field}_killPwr_noAugment.npy"
@@ -213,7 +280,7 @@ def load_presplit_files(config,augment=False):
                 filename_val = f"/val_{fileDir}_{field}_killPwr_noAugment.npy"
                 filename_test = f"/test_{fileDir}_{field}_killPwr_noAugment.npy"
 
-                dir = 'Kill_Power/'
+                dir = config.path_to_dir + 'Kill_Power/'
 
             x_train = np.load(dir + fileDir + filename_train, mmap_mode='c') # the images
             x_val = np.load(dir + fileDir + filename_val, mmap_mode='c') # the images
@@ -237,10 +304,15 @@ def load_presplit_files(config,augment=False):
         plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
         plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
 
-    # Combine into TensorDataset
-    train_full = TensorDataset(img_train_with_channel,labels_train)
-    val_full = TensorDataset(img_val_with_channel,labels_val)
-    test_full = TensorDataset(img_test_with_channel,labels_test)
+    # TODO: Check this and make sure it transforms the target images too when doing a U-net...
+    if config.use_transforms:
+        train_full = add_transforms([img_train_with_channel], labels_train)
+        val_full = add_transforms([img_val_with_channel], labels_val)
+        test_full = add_transforms([img_test_with_channel], labels_test)
+    else:
+        train_full = TensorDataset(img_train_with_channel,labels_train)
+        val_full = TensorDataset(img_val_with_channel,labels_val)
+        test_full = TensorDataset(img_test_with_channel,labels_test)
 
     return train_full, val_full, test_full
 
@@ -330,7 +402,7 @@ def load_presplit_files_unet(config,augment=False):
         filename_val1 = f"/val_{fileDir}_{field1}_noAugment.npy"
         filename_test1 = f"/test_{fileDir}_{field1}_noAugment.npy"
 
-        dir = 'Full_Power/'
+        dir = config.path_to_dir + 'Full_Power/'
 
 
         if config.killPwr: # use images where power spectra are flattened
@@ -350,14 +422,12 @@ def load_presplit_files_unet(config,augment=False):
             filename_val1 = f"/val_{fileDir}_{field1}_killPwr_noAugment.npy"
             filename_test1 = f"/test_{fileDir}_{field1}_killPwr_noAugment.npy"
 
-            dir = 'Kill_Power/'
-
-        if config.run_colab:
-            dir = config.path_to_dir
+            dir = config.path_to_dir + 'Kill_Power/'
 
         print("Training filenames:")
         print(filename_train0)
         print(filename_train1)
+
         x_train = np.load(dir + fileDir + filename_train0, mmap_mode='c') # the images
         x_val = np.load(dir + fileDir + filename_val0, mmap_mode='c') # the images
         x_test = np.load(dir + fileDir + filename_test0, mmap_mode='c') # the images
@@ -407,12 +477,15 @@ def load_presplit_files_unet(config,augment=False):
     z_test_full = torch.from_numpy(z_test_full)
     z_test_full = z_test_full.type(torch.LongTensor) # throws error unless label is a LongTensor (64)
 
+    if config.use_transforms:
+        train_full = add_transforms([x_train_with_channel, y_train_with_channel], z_train_full)
+        val_full = add_transforms([x_val_with_channel, y_val_with_channel], z_val_full)
+        test_full = add_transforms([x_test_with_channel, y_test_with_channel], z_test_full)
 
-
-    # Combine into TensorDataset
-    train_full = TensorDataset(x_train_with_channel,y_train_with_channel, z_train_full)
-    val_full = TensorDataset(x_val_with_channel, y_val_with_channel, z_val_full)
-    test_full = TensorDataset(x_test_with_channel, y_test_with_channel, z_test_full)
+    else:
+        train_full = CustomDataset([x_train_with_channel,y_train_with_channel], z_train_full)
+        val_full = CustomDataset([x_val_with_channel, y_val_with_channel], z_val_full)
+        test_full = CustomDataset([x_test_with_channel, y_test_with_channel], z_test_full)
 
     return train_full, val_full, test_full
 
@@ -435,6 +508,57 @@ def preprocess(config,augment=False):
                                                       val_data, test_data,
                                                       check_representation=False)
     return train_dl, valid_dl, test_dl
+
+
+
+# For unit testing #
+from dataclasses import dataclass
+
+def _test_loader_():
+
+    @dataclass
+    class TestConfig:
+        sim_type = 'unet'
+        batch_size = 64
+        fileDirArr = ['MHD_beta10']
+        field_list = ['density','magnetic_energy_density']
+        data_presplit = True # whether data has already been split into training, val, test
+        killPwr = False
+        run_locally = True
+        run_colab = False
+        use_transforms = False
+        path_to_dir = '../'
+
+    config_test = TestConfig()
+
+    # other inputs needed
+    augment = True
+
+    # call preprocess(config, augment) with and without transforms
+    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+
+    # print sizes of datasets
+    print("Size of training data: ")
+    print(train_dl.__len__())
+
+    for i, data in enumerate(train_dl):
+        x, y, z = data
+        batch_imshow(make_grid(x, 8), title = 'Training: Sample density batch')
+        batch_imshow(make_grid(y, 8), title = 'Training: Sample magnetic energy density batch')
+        break  # we need just one batch
+
+    for i, data in enumerate(valid_dl):
+        x, y, z = data
+        batch_imshow(make_grid(x, 8), title = 'Validation: Sample density batch')
+        batch_imshow(make_grid(y, 8), title = 'Validation: Sample magnetic energy density batch')
+        break  # we need just one batch
+
+    for i, data in enumerate(test_dl):
+        x, y, z = data
+        batch_imshow(make_grid(x, 8), title = 'Testing: Sample density batch')
+        batch_imshow(make_grid(y, 8), title = 'Testing: Sample magnetic energy density batch')
+        break  # we need just one batch
+
 
 
 
