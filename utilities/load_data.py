@@ -29,7 +29,7 @@ import os
 import gdown
 
 
-class CustomDataset(Dataset):
+class CustomUnetDataset(Dataset):
     """TensorDataset that supports transforms for both input and target images
     """
     def __init__(self, inputs, labels, transform=None):
@@ -57,6 +57,34 @@ class CustomDataset(Dataset):
 
     def __len__(self):
         return self.inputs[0].size(0)
+
+
+class CustomClassifyDataset(Dataset):
+    """TensorDataset that supports transforms for input images
+       Assumes there are only input images (x) with labels (y)
+    """
+    def __init__(self, inputs, labels, transform=None):
+        self.inputs = inputs
+        self.labels = labels
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = self.inputs[0][index]
+        z = self.labels[index]
+
+        if not np.any(x.numpy() > 0): # skip the images that are blank
+            rep_index = np.random.randint(0, 8)
+            return self.__getitem__(rep_index)
+
+        if self.transform:
+            x = self.transform(x)
+
+
+        return x, y
+
+    def __len__(self):
+        return self.inputs[0].size(0)
+
 
 
 
@@ -213,7 +241,7 @@ def reformat(x_full, y_full):
     return x_with_channel, y_full
 
 
-def add_transforms(tensors,labels):
+def add_transforms(config, tensors, labels):
     horiz = T.Compose([
             T.ToPILImage(),
             T.RandomHorizontalFlip(1.0),
@@ -227,12 +255,35 @@ def add_transforms(tensors,labels):
             ])
 
 
-    # Combine into TensorDataset
-    no_transforms = CustomDataset(tensors,labels,transform=None)
-    horiz_transforms = CustomDataset(tensors,labels,transform=horiz)
-    vert_transforms = CustomDataset(tensors,labels,transform=vert)
+    # Combine into Dataset
+    # Type of CustomDataset is determined based on sim_type
 
-    full_dataset = torch.utils.data.ConcatDataset([no_transforms, horiz_transforms, vert_transforms])
+    if config.sim_type=='classify':
+        no_transforms = CustomClassifyDataset(tensors,labels,transform=None)
+
+        if config.use_transforms:
+            horiz_transforms = CustomClassifyDataset(tensors,labels,transform=horiz)
+            vert_transforms = CustomClassifyDataset(tensors,labels,transform=vert)
+
+            # concatenate the non-transformed and transformed datasets
+            full_dataset = torch.utils.data.ConcatDataset([no_transforms, horiz_transforms, vert_transforms])
+        else:
+            full_dataset = no_transforms
+
+    elif config.sim_type=='unet':
+        no_transforms = CustomUnetDataset(tensors,labels,transform=None)
+
+        if config.use_transforms:
+            horiz_transforms = CustomUnetDataset(tensors,labels,transform=horiz)
+            vert_transforms = CustomUnetDataset(tensors,labels,transform=vert)
+
+            # concatenate the non-transformed and transformed datasets
+            full_dataset = torch.utils.data.ConcatDataset([no_transforms, horiz_transforms, vert_transforms])
+        else:
+            full_dataset = no_transforms
+
+    else:
+        raise Exception("sim_type is not valid, must be either 'classify' or 'unet' ")
 
     return full_dataset
 
@@ -304,15 +355,10 @@ def load_presplit_files(config,augment=False):
         plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
         plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
 
-    # TODO: Check this and make sure it transforms the target images too when doing a U-net...
-    if config.use_transforms:
-        train_full = add_transforms([img_train_with_channel], labels_train)
-        val_full = add_transforms([img_val_with_channel], labels_val)
-        test_full = add_transforms([img_test_with_channel], labels_test)
-    else:
-        train_full = TensorDataset(img_train_with_channel,labels_train)
-        val_full = TensorDataset(img_val_with_channel,labels_val)
-        test_full = TensorDataset(img_test_with_channel,labels_test)
+    # Add transforms (if wanted) and return as Datasets
+    train_full = add_transforms(config, [img_train_with_channel], labels_train)
+    val_full = add_transforms(config, [img_val_with_channel], labels_val)
+    test_full = add_transforms(config, [img_test_with_channel], labels_test)
 
     return train_full, val_full, test_full
 
@@ -424,9 +470,6 @@ def load_presplit_files_unet(config,augment=False):
 
             dir = config.path_to_dir + 'Kill_Power/'
 
-        print("Training filenames:")
-        print(filename_train0)
-        print(filename_train1)
 
         x_train = np.load(dir + fileDir + filename_train0, mmap_mode='c') # the images
         x_val = np.load(dir + fileDir + filename_val0, mmap_mode='c') # the images
@@ -477,15 +520,10 @@ def load_presplit_files_unet(config,augment=False):
     z_test_full = torch.from_numpy(z_test_full)
     z_test_full = z_test_full.type(torch.LongTensor) # throws error unless label is a LongTensor (64)
 
-    if config.use_transforms:
-        train_full = add_transforms([x_train_with_channel, y_train_with_channel], z_train_full)
-        val_full = add_transforms([x_val_with_channel, y_val_with_channel], z_val_full)
-        test_full = add_transforms([x_test_with_channel, y_test_with_channel], z_test_full)
-
-    else:
-        train_full = CustomDataset([x_train_with_channel,y_train_with_channel], z_train_full)
-        val_full = CustomDataset([x_val_with_channel, y_val_with_channel], z_val_full)
-        test_full = CustomDataset([x_test_with_channel, y_test_with_channel], z_test_full)
+    # add transforms (if wanted) and return as Datasets
+    train_full = add_transforms(config, [x_train_with_channel, y_train_with_channel], z_train_full)
+    val_full = add_transforms(config, [x_val_with_channel, y_val_with_channel], z_val_full)
+    test_full = add_transforms(config, [x_test_with_channel, y_test_with_channel], z_test_full)
 
     return train_full, val_full, test_full
 
@@ -531,16 +569,80 @@ def _test_loader_():
 
     config_test = TestConfig()
 
+
+    # TODO: Make this a loop with many cases that must pass
     # other inputs needed
+
     augment = True
 
+    print("######################################")
     # call preprocess(config, augment) with and without transforms
+    print("Loading files for U-net without transformations")
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+
+    # print sizes of datasets
+    print("Size of training data: ")
+    print(train_dl.__len__())
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+
+    config_test.use_transforms = True
+    print("Loading files for U-net WITH transformations")
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+
+    # print sizes of datasets
+    print("Size of training data: ")
+    print(train_dl.__len__())
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+
+    print("######################################")
+
+    config_test.sim_type = 'classify'
+    config_test.use_transforms = False
+
+    # call preprocess(config, augment) with and without transforms
+    print("Loading files for classification without transformations")
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+
+    # print sizes of datasets
+    print("Size of training data: ")
+    print(train_dl.__len__())
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+
+    config_test.use_transforms = True
+    print("Loading files for classification WITH transformations")
+    print("...")
+    print("...")
+    print("...")
+    print("...")
     train_dl, valid_dl, test_dl = preprocess(config_test,augment)
 
     # print sizes of datasets
     print("Size of training data: ")
     print(train_dl.__len__())
 
+
+    """
     for i, data in enumerate(train_dl):
         x, y, z = data
         batch_imshow(make_grid(x, 8), title = 'Training: Sample density batch')
@@ -558,7 +660,7 @@ def _test_loader_():
         batch_imshow(make_grid(x, 8), title = 'Testing: Sample density batch')
         batch_imshow(make_grid(y, 8), title = 'Testing: Sample magnetic energy density batch')
         break  # we need just one batch
-
+    """
 
 
 
