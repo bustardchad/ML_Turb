@@ -10,7 +10,11 @@
 #          run_locally = True -- only set to True if running on my local computer
 #          run_colab = False -- set to true if running on Google Colab
 #          use_transforms = False -- if True, augment data with horizontal and vertical flips
-#          path_to_dir = '../' -- should be set to '' if Full_Power or Kill_Power directories are in same folder as this script
+#          dataset_size = 'large' or 'small' (large includes 4x more images)
+#          path_to_dir = '../'
+#               -- set to '' if downloading files from Google Drive
+#               -- set to '../Full_Power/' or '../Kill_Power/' if running on local computer
+#               -- set to full path to fileDirArr if mounting Google Drive on Colab
 #
 # Output: DataLoaders for training, validation, and test sets
 #           i.e. train_dl, valid_dl, test_dl
@@ -88,22 +92,22 @@ class CustomClassifyDataset(Dataset):
 
 
 
-# downloads data folder at URL
+# downloads data folder at URL dependent upon config settings
 def download_data(config):
     # Download the relevant data from Google Drive
 
     if (config.run_locally==False):
 
-    # Path for the FULL google drive file with turb sim data
-    # url = "https://drive.google.com/drive/folders/1C9zPwEglOZI7CqiS4Rz2MESCJzS4wTd2"
-
-    # Path for the smaller turb sim data files (without augmentation)
-    #url = "https://drive.google.com/drive/folders/1YDXgeazcwfyciAGUv_sW-gHDy7e1k5wY"
-
-        url = "https://drive.google.com/drive/folders/1zzwYNPSV42jyEQVErlbE-CyKGIustlHv"
-
-        if config.killPwr:
-            url = "https://drive.google.com/drive/folders/1B7N_x5Y1N0wH96vKubyQ86Oftaz2M8W9"
+        if ((config.dataset_size == 'small') and (config.killPwr == False)):
+            url = "https://drive.google.com/drive/folders/1gSfyMstWIO8BjAoD_6t-a5xDmMd6cfCW"
+        elif ((config.dataset_size == 'large') and (config.killPwr == False)):
+            raise Exception("Large dataset not loaded to Google Drive yet")
+        elif ((config.dataset_size == 'small') and (config.killPwr == True)):
+            raise Exception("Kill_Power not loaded to Google Drive yet")
+        elif ((config.dataset_size == 'large') and (config.killPwr == True)):
+            raise Exception("Large dataset not loaded to Google Drive yet")
+        else:
+            raise Warning("Invalid dataset_size or killPwr flag, will default to 'small' and 'false'")
 
 
         #if not os.path.exists("Image_Cubes_noAugment"):
@@ -296,7 +300,7 @@ def add_transforms(config, tensors, labels):
 #         field_list -- list of fields
 #         Options are: density, magnetic_energy_density, alfven_speed
 #         e.g. field_list = ['density']
-def load_presplit_files(config,augment=False):
+def load_presplit_files(config):
     fileDirArr = config.fileDirArr
     field_list = config.field_list
     # For a given field...
@@ -310,28 +314,28 @@ def load_presplit_files(config,augment=False):
         y_test_full = []
         lbl = 0
         for fileDir in fileDirArr:
-            #filename_train = f"/train_{fileDir}_{field}_noAugment.npy"
-            if augment:
-                filename_train = f"/train_{fileDir}_{field}.npy"
+            if config.dataset_size=='large':
+                filename_train = f"/train_{fileDir}_{field}_large.npy"
+                filename_val = f"/val_{fileDir}_{field}_large.npy"
+                filename_test = f"/test_{fileDir}_{field}_large.npy"
             else:
-                filename_train = f"/train_{fileDir}_{field}_noAugment.npy"
+                filename_train = f"/train_{fileDir}_{field}_small.npy"
+                filename_val = f"/val_{fileDir}_{field}_small.npy"
+                filename_test = f"/test_{fileDir}_{field}_small.npy"
 
-            filename_val = f"/val_{fileDir}_{field}_noAugment.npy"
-            filename_test = f"/test_{fileDir}_{field}_noAugment.npy"
-
-            dir = config.path_to_dir + 'Full_Power/'
+            dir = config.path_to_dir
 
             if config.killPwr: # use images where power spectra are flattened
-                #filename_train = f"/train_{fileDir}_{field}_killPwr_noAugment.npy"
-                if augment:
-                    filename_train = f"/train_{fileDir}_{field}_killPwr.npy"
+                if config.dataset_size=='large':
+                    filename_train = f"/train_{fileDir}_{field}_killPwr_large.npy"
+                    filename_val = f"/val_{fileDir}_{field}_killPwr_large.npy"
+                    filename_test = f"/test_{fileDir}_{field}_killPwr_large.npy"
                 else:
-                    filename_train = f"/train_{fileDir}_{field}_killPwr_noAugment.npy"
+                    filename_train = f"/train_{fileDir}_{field}_killPwr_small.npy"
+                    filename_val = f"/val_{fileDir}_{field}_killPwr_small.npy"
+                    filename_test = f"/test_{fileDir}_{field}_killPwr_small.npy"
 
-                filename_val = f"/val_{fileDir}_{field}_killPwr_noAugment.npy"
-                filename_test = f"/test_{fileDir}_{field}_killPwr_noAugment.npy"
-
-                dir = config.path_to_dir + 'Kill_Power/'
+                dir = config.path_to_dir
 
             x_train = np.load(dir + fileDir + filename_train, mmap_mode='c') # the images
             x_val = np.load(dir + fileDir + filename_val, mmap_mode='c') # the images
@@ -411,7 +415,7 @@ def add_channel(x_full):
 
     return x_with_channel
 
-def load_presplit_files_unet(config,augment=False):
+def load_presplit_files_unet(config):
     fileDirArr = config.fileDirArr
     field_list = config.field_list
     # For a given field...
@@ -432,43 +436,47 @@ def load_presplit_files_unet(config,augment=False):
     lbl = 0
 
     for fileDir in fileDirArr:
-        if augment:
-            filename_train0 = f"/train_{fileDir}_{field0}.npy"
+        if config.dataset_size=='large':
+            filename_train0 = f"/train_{fileDir}_{field0}_large.npy"
+            filename_val0 = f"/val_{fileDir}_{field0}_large.npy"
+            filename_test0 = f"/test_{fileDir}_{field0}_large.npy"
         else:
-            filename_train0 = f"/train_{fileDir}_{field0}_noAugment.npy"
+            filename_train0 = f"/train_{fileDir}_{field0}_small.npy"
+            filename_val0 = f"/val_{fileDir}_{field0}_small.npy"
+            filename_test0 = f"/test_{fileDir}_{field0}_small.npy"
 
-        filename_val0 = f"/val_{fileDir}_{field0}_noAugment.npy"
-        filename_test0 = f"/test_{fileDir}_{field0}_noAugment.npy"
-
-        if augment:
-            filename_train1 = f"/train_{fileDir}_{field1}.npy"
+        if config.dataset_size=='large':
+            filename_train1 = f"/train_{fileDir}_{field1}_large.npy"
+            filename_val1 = f"/val_{fileDir}_{field1}_large.npy"
+            filename_test1 = f"/test_{fileDir}_{field1}_large.npy"
         else:
-            filename_train1 = f"/train_{fileDir}_{field1}_noAugment.npy"
+            filename_train1 = f"/train_{fileDir}_{field1}_small.npy"
+            filename_val1 = f"/val_{fileDir}_{field1}_small.npy"
+            filename_test1 = f"/test_{fileDir}_{field1}_small.npy"
 
-        filename_val1 = f"/val_{fileDir}_{field1}_noAugment.npy"
-        filename_test1 = f"/test_{fileDir}_{field1}_noAugment.npy"
-
-        dir = config.path_to_dir + 'Full_Power/'
+        dir = config.path_to_dir
 
 
         if config.killPwr: # use images where power spectra are flattened
-            if augment:
-                filename_train0 = f"/train_{fileDir}_{field0}_killPwr.npy"
+            if config.dataset_size=='large':
+                filename_train0 = f"/train_{fileDir}_{field0}_killPwr_large.npy"
+                filename_val0 = f"/val_{fileDir}_{field0}_killPwr_large.npy"
+                filename_test0 = f"/test_{fileDir}_{field0}_killPwr_large.npy"
             else:
-                filename_train0 = f"/train_{fileDir}_{field0}_killPwr_noAugment.npy"
+                filename_train0 = f"/train_{fileDir}_{field0}_killPwr_small.npy"
+                filename_val0 = f"/val_{fileDir}_{field0}_killPwr_small.npy"
+                filename_test0 = f"/test_{fileDir}_{field0}_killPwr_small.npy"
 
-            filename_val0 = f"/val_{fileDir}_{field0}_killPwr_noAugment.npy"
-            filename_test0 = f"/test_{fileDir}_{field0}_killPwr_noAugment.npy"
-
-            if augment:
-                filename_train1 = f"/train_{fileDir}_{field1}_killPwr.npy"
+            if config.dataset_size=='large':
+                filename_train1 = f"/train_{fileDir}_{field1}_killPwr_large.npy"
+                filename_val1 = f"/val_{fileDir}_{field1}_killPwr_large.npy"
+                filename_test1 = f"/test_{fileDir}_{field1}_killPwr_large.npy"
             else:
-                filename_train1 = f"/train_{fileDir}_{field1}_killPwr_noAugment.npy"
+                filename_train1 = f"/train_{fileDir}_{field1}_killPwr_small.npy"
+                filename_val1 = f"/val_{fileDir}_{field1}_killPwr_small.npy"
+                filename_test1 = f"/test_{fileDir}_{field1}_killPwr_small.npy"
 
-            filename_val1 = f"/val_{fileDir}_{field1}_killPwr_noAugment.npy"
-            filename_test1 = f"/test_{fileDir}_{field1}_killPwr_noAugment.npy"
-
-            dir = config.path_to_dir + 'Kill_Power/'
+            dir = config.path_to_dir
 
 
         x_train = np.load(dir + fileDir + filename_train0, mmap_mode='c') # the images
@@ -530,16 +538,16 @@ def load_presplit_files_unet(config,augment=False):
 
 # loads files assuming they are pre-split into training, validation, and test sets
 # returns DataTensors for each split
-def preprocess(config,augment=False):
+def preprocess(config):
     if (config.sim_type=='classify'):
-        train_data, val_data, test_data = load_presplit_files(config,augment)
+        train_data, val_data, test_data = load_presplit_files(config)
 
         # create DataLoaders
         train_dl, valid_dl, test_dl = create_data_loaders(config, train_data,
                                                       val_data, test_data,
                                                       check_representation=True)
     elif (config.sim_type=='unet'):
-        train_data, val_data, test_data = load_presplit_files_unet(config,augment)
+        train_data, val_data, test_data = load_presplit_files_unet(config)
 
         # create DataLoaders
         train_dl, valid_dl, test_dl = create_data_loaders(config, train_data,
@@ -565,6 +573,7 @@ def _test_loader_():
         run_locally = True
         run_colab = False
         use_transforms = False
+        dataset_size = 'large'
         path_to_dir = '../'
 
     config_test = TestConfig()
@@ -573,24 +582,24 @@ def _test_loader_():
     # TODO: Make this a loop with many cases that must pass
     # other inputs needed
 
-    augment = True
 
     print("######################################")
-    # call preprocess(config, augment) with and without transforms
+    # call preprocess with and without transforms
     print("Loading files for U-net without transformations")
     print("...")
     print("...")
     print("...")
     print("...")
-    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+    train_dl, valid_dl, test_dl = preprocess(config_test)
 
     # print sizes of datasets
     print("Size of training data: ")
-    print(train_dl.__len__())
+    print(len(train_dl.dataset))
     print("...")
     print("...")
     print("...")
     print("...")
+
 
     config_test.use_transforms = True
     print("Loading files for U-net WITH transformations")
@@ -598,11 +607,11 @@ def _test_loader_():
     print("...")
     print("...")
     print("...")
-    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+    train_dl, valid_dl, test_dl = preprocess(config_test)
 
     # print sizes of datasets
     print("Size of training data: ")
-    print(train_dl.__len__())
+    print(len(train_dl.dataset))
     print("...")
     print("...")
     print("...")
@@ -613,17 +622,17 @@ def _test_loader_():
     config_test.sim_type = 'classify'
     config_test.use_transforms = False
 
-    # call preprocess(config, augment) with and without transforms
+    # call preprocess with and without transforms
     print("Loading files for classification without transformations")
     print("...")
     print("...")
     print("...")
     print("...")
-    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+    train_dl, valid_dl, test_dl = preprocess(config_test)
 
     # print sizes of datasets
     print("Size of training data: ")
-    print(train_dl.__len__())
+    print(len(train_dl.dataset))
     print("...")
     print("...")
     print("...")
@@ -635,11 +644,11 @@ def _test_loader_():
     print("...")
     print("...")
     print("...")
-    train_dl, valid_dl, test_dl = preprocess(config_test,augment)
+    train_dl, valid_dl, test_dl = preprocess(config_test)
 
     # print sizes of datasets
     print("Size of training data: ")
-    print(train_dl.__len__())
+    print(len(train_dl.dataset))
 
 
     """
