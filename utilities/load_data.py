@@ -74,7 +74,7 @@ class CustomClassifyDataset(Dataset):
 
     def __getitem__(self, index):
         x = self.inputs[0][index]
-        z = self.labels[index]
+        y = self.labels[index]
 
         if not np.any(x.numpy() > 0): # skip the images that are blank
             rep_index = np.random.randint(0, 8)
