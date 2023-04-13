@@ -26,7 +26,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data.dataloader import DataLoader
-from torch.utils.data import Dataset, TensorDataset, random_split
+from torch.utils.data import Dataset, ConcatDataset, TensorDataset, random_split
 import torchvision.transforms as T
 import pdb
 import os
@@ -144,9 +144,14 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
     batch_size=config.batch_size
 
     #load the train and validation into batches.
-    train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+    if (config.hold_out_test_set == True):
+        train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+        test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
+    else:
+        train_dl = DataLoader(ConcatDataset([train_data,test_data]), batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+        test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
+
     valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
-    test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
 
     """
     for i, data in enumerate(train_dl):
@@ -418,6 +423,10 @@ def add_channel(x_full):
 def load_presplit_files_unet(config):
     fileDirArr = config.fileDirArr
     field_list = config.field_list
+
+    # path to files in fileDirArr
+    dir = config.path_to_dir
+
     # For a given field...
     # read in npy files under each file directory
 
@@ -454,7 +463,6 @@ def load_presplit_files_unet(config):
             filename_val1 = f"/val_{fileDir}_{field1}_small.npy"
             filename_test1 = f"/test_{fileDir}_{field1}_small.npy"
 
-        dir = config.path_to_dir
 
 
         if config.killPwr: # use images where power spectra are flattened
@@ -476,7 +484,6 @@ def load_presplit_files_unet(config):
                 filename_val1 = f"/val_{fileDir}_{field1}_killPwr_small.npy"
                 filename_test1 = f"/test_{fileDir}_{field1}_killPwr_small.npy"
 
-            dir = config.path_to_dir
 
 
         x_train = np.load(dir + fileDir + filename_train0, mmap_mode='c') # the images
@@ -528,6 +535,10 @@ def load_presplit_files_unet(config):
     z_test_full = torch.from_numpy(z_test_full)
     z_test_full = z_test_full.type(torch.LongTensor) # throws error unless label is a LongTensor (64)
 
+    print("Debugging: ")
+    print("Shape of data before making into datasets and adding transforms: ")
+    print(x_train_with_channel.shape, y_train_with_channel.shape, z_train_full.shape)
+
     # add transforms (if wanted) and return as Datasets
     train_full = add_transforms(config, [x_train_with_channel, y_train_with_channel], z_train_full)
     val_full = add_transforms(config, [x_val_with_channel, y_val_with_channel], z_val_full)
@@ -573,8 +584,9 @@ def _test_loader_():
         run_locally = True
         run_colab = False
         use_transforms = False
-        dataset_size = 'large'
-        path_to_dir = '../'
+        dataset_size = 'small'
+        hold_out_test_set = False
+        path_to_dir = '../Full_Power/'
 
     config_test = TestConfig()
 
@@ -600,7 +612,24 @@ def _test_loader_():
     print("...")
     print("...")
 
+    ####################
+    config_test.hold_out_test_set = True
+    # call preprocess with and without transforms
+    print("Loading files for U-net with test set held out of training set")
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+    train_dl, valid_dl, test_dl = preprocess(config_test)
 
+    # print sizes of datasets
+    print("Size of training data: ")
+    print(len(train_dl.dataset))
+    print("...")
+    print("...")
+    print("...")
+
+    #########################3
     config_test.use_transforms = True
     print("Loading files for U-net WITH transformations")
     print("...")
