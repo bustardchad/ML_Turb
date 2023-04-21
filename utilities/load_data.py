@@ -103,7 +103,7 @@ def download_data(config):
         elif ((config.dataset_size == 'large') and (config.killPwr == False)):
             raise Exception("Large dataset not loaded to Google Drive yet")
         elif ((config.dataset_size == 'small') and (config.killPwr == True)):
-            raise Exception("Kill_Power not loaded to Google Drive yet")
+            url = "https://drive.google.com/drive/folders/1_QCS78V1XB7YYTQc2alutmC1wmNSt9nx"
         elif ((config.dataset_size == 'large') and (config.killPwr == True)):
             raise Exception("Large dataset not loaded to Google Drive yet")
         else:
@@ -332,13 +332,13 @@ def load_presplit_files(config):
 
             if config.killPwr: # use images where power spectra are flattened
                 if config.dataset_size=='large':
-                    filename_train = f"/train_{fileDir}_{field}_killPwr_large.npy"
-                    filename_val = f"/val_{fileDir}_{field}_killPwr_large.npy"
-                    filename_test = f"/test_{fileDir}_{field}_killPwr_large.npy"
+                    filename_train = f"/train_{fileDir}_{field}_large.npy"
+                    filename_val = f"/val_{fileDir}_{field}_large.npy"
+                    filename_test = f"/test_{fileDir}_{field}_large.npy"
                 else:
-                    filename_train = f"/train_{fileDir}_{field}_killPwr_small.npy"
-                    filename_val = f"/val_{fileDir}_{field}_killPwr_small.npy"
-                    filename_test = f"/test_{fileDir}_{field}_killPwr_small.npy"
+                    filename_train = f"/train_{fileDir}_{field}_small.npy"
+                    filename_val = f"/val_{fileDir}_{field}_small.npy"
+                    filename_test = f"/test_{fileDir}_{field}_small.npy"
 
                 dir = config.path_to_dir
 
@@ -467,22 +467,22 @@ def load_presplit_files_unet(config):
 
         if config.killPwr: # use images where power spectra are flattened
             if config.dataset_size=='large':
-                filename_train0 = f"/train_{fileDir}_{field0}_killPwr_large.npy"
-                filename_val0 = f"/val_{fileDir}_{field0}_killPwr_large.npy"
-                filename_test0 = f"/test_{fileDir}_{field0}_killPwr_large.npy"
+                filename_train0 = f"/train_{fileDir}_{field0}_large.npy"
+                filename_val0 = f"/val_{fileDir}_{field0}_large.npy"
+                filename_test0 = f"/test_{fileDir}_{field0}_large.npy"
             else:
-                filename_train0 = f"/train_{fileDir}_{field0}_killPwr_small.npy"
-                filename_val0 = f"/val_{fileDir}_{field0}_killPwr_small.npy"
-                filename_test0 = f"/test_{fileDir}_{field0}_killPwr_small.npy"
+                filename_train0 = f"/train_{fileDir}_{field0}_small.npy"
+                filename_val0 = f"/val_{fileDir}_{field0}_small.npy"
+                filename_test0 = f"/test_{fileDir}_{field0}_small.npy"
 
             if config.dataset_size=='large':
-                filename_train1 = f"/train_{fileDir}_{field1}_killPwr_large.npy"
-                filename_val1 = f"/val_{fileDir}_{field1}_killPwr_large.npy"
-                filename_test1 = f"/test_{fileDir}_{field1}_killPwr_large.npy"
+                filename_train1 = f"/train_{fileDir}_{field1}_large.npy"
+                filename_val1 = f"/val_{fileDir}_{field1}_large.npy"
+                filename_test1 = f"/test_{fileDir}_{field1}_large.npy"
             else:
-                filename_train1 = f"/train_{fileDir}_{field1}_killPwr_small.npy"
-                filename_val1 = f"/val_{fileDir}_{field1}_killPwr_small.npy"
-                filename_test1 = f"/test_{fileDir}_{field1}_killPwr_small.npy"
+                filename_train1 = f"/train_{fileDir}_{field1}_small.npy"
+                filename_val1 = f"/val_{fileDir}_{field1}_small.npy"
+                filename_test1 = f"/test_{fileDir}_{field1}_small.npy"
 
 
 
