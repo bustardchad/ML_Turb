@@ -46,7 +46,7 @@ class CustomUnetDataset(Dataset):
         y = self.inputs[1][index]
         z = self.labels[index]
 
-        if not np.any(x.numpy() > 0): # skip the images that are blank
+        if ((not np.any(x.numpy() > 0) or (not np.any(y.numpy() > 0))): # skip the images that are blank
             rep_index = np.random.randint(0, 8)
             return self.__getitem__(rep_index)
         #assert np.any(x.numpy() > 0), "Error: input image is blank"
@@ -64,7 +64,7 @@ class CustomUnetDataset(Dataset):
 
 
 class CustomClassifyDataset(Dataset):
-    """TensorDataset that supports transforms for input images
+    """TensorDataset that supports transforms for input imaas
        Assumes there are only input images (x) with labels (y)
     """
     def __init__(self, inputs, labels, transform=None):
