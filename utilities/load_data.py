@@ -400,11 +400,12 @@ def add_labels_unet(x, x_full, y, y_full, z_full, lbl):
     # (e.g. 0 for beta = 1, 1 for beta = 10, 2 for beta = 100)
     z = np.ones(x.shape[2])*lbl # label these images by lbl
 
+    # if files are from first class, make x_full = x, etc.
     if lbl==0:
         x_full = x
         y_full = y
         z_full = z
-    else:
+    else: # add new x, y, z to pre-existing x_full, y_full, z_full
         x_full = np.concatenate([x_full,x],axis=2)
         y_full = np.concatenate([y_full,y],axis=2)
         z_full = np.concatenate([z_full,z])
@@ -445,45 +446,13 @@ def load_presplit_files_unet(config):
     lbl = 0
 
     for fileDir in fileDirArr:
-        if config.dataset_size=='large':
-            filename_train0 = f"/train_{fileDir}_{field0}_large.npy"
-            filename_val0 = f"/val_{fileDir}_{field0}_large.npy"
-            filename_test0 = f"/test_{fileDir}_{field0}_large.npy"
-        else:
-            filename_train0 = f"/train_{fileDir}_{field0}_small.npy"
-            filename_val0 = f"/val_{fileDir}_{field0}_small.npy"
-            filename_test0 = f"/test_{fileDir}_{field0}_small.npy"
+        filename_train0 = f"/train_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
+        filename_val0 = f"/val_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
+        filename_test0 = f"/test_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
 
-        if config.dataset_size=='large':
-            filename_train1 = f"/train_{fileDir}_{field1}_large.npy"
-            filename_val1 = f"/val_{fileDir}_{field1}_large.npy"
-            filename_test1 = f"/test_{fileDir}_{field1}_large.npy"
-        else:
-            filename_train1 = f"/train_{fileDir}_{field1}_small.npy"
-            filename_val1 = f"/val_{fileDir}_{field1}_small.npy"
-            filename_test1 = f"/test_{fileDir}_{field1}_small.npy"
-
-
-
-        if config.killPwr: # use images where power spectra are flattened
-            if config.dataset_size=='large':
-                filename_train0 = f"/train_{fileDir}_{field0}_large.npy"
-                filename_val0 = f"/val_{fileDir}_{field0}_large.npy"
-                filename_test0 = f"/test_{fileDir}_{field0}_large.npy"
-            else:
-                filename_train0 = f"/train_{fileDir}_{field0}_small.npy"
-                filename_val0 = f"/val_{fileDir}_{field0}_small.npy"
-                filename_test0 = f"/test_{fileDir}_{field0}_small.npy"
-
-            if config.dataset_size=='large':
-                filename_train1 = f"/train_{fileDir}_{field1}_large.npy"
-                filename_val1 = f"/val_{fileDir}_{field1}_large.npy"
-                filename_test1 = f"/test_{fileDir}_{field1}_large.npy"
-            else:
-                filename_train1 = f"/train_{fileDir}_{field1}_small.npy"
-                filename_val1 = f"/val_{fileDir}_{field1}_small.npy"
-                filename_test1 = f"/test_{fileDir}_{field1}_small.npy"
-
+        filename_train1 = f"/train_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
+        filename_val1 = f"/val_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
+        filename_test1 = f"/test_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
 
 
         x_train = np.load(dir + fileDir + filename_train0, mmap_mode='c') # the images
@@ -497,6 +466,7 @@ def load_presplit_files_unet(config):
         # assign a class value to each image depending on which simulation it came from
         # (e.g. 0 for beta = 1, 1 for beta = 10, 2 for beta = 100)
 
+        # updates x_train_full, y_train_full, z_train_full with data from each fileDir
         x_train_full, y_train_full, z_train_full = add_labels_unet(x_train,
                                                               x_train_full,
                                                               y_train,
@@ -535,9 +505,9 @@ def load_presplit_files_unet(config):
     z_test_full = torch.from_numpy(z_test_full)
     z_test_full = z_test_full.type(torch.LongTensor) # throws error unless label is a LongTensor (64)
 
-    print("Debugging: ")
-    print("Shape of data before making into datasets and adding transforms: ")
-    print(x_train_with_channel.shape, y_train_with_channel.shape, z_train_full.shape)
+    #print("Debugging: ")
+    #print("Shape of data before making into datasets and adding transforms: ")
+    #print(x_train_with_channel.shape, y_train_with_channel.shape, z_train_full.shape)
 
     # add transforms (if wanted) and return as Datasets
     train_full = add_transforms(config, [x_train_with_channel, y_train_with_channel], z_train_full)
@@ -577,22 +547,21 @@ def _test_loader_():
     class TestConfig:
         sim_type = 'unet'
         batch_size = 64
-        fileDirArr = ['MHD_beta10']
-        field_list = ['density','magnetic_energy_density']
+        fileDirArr = ['CR_Advect_beta10','CR_Diff_Fiducial_beta10']
+        field_list = ['density','Ec']
         data_presplit = True # whether data has already been split into training, val, test
         killPwr = False
         run_locally = True
         run_colab = False
         use_transforms = False
         dataset_size = 'small'
-        hold_out_test_set = False
+        hold_out_test_set = True
         path_to_dir = '../Full_Power/'
 
     config_test = TestConfig()
 
 
-    # TODO: Make this a loop with many cases that must pass
-    # other inputs needed
+    # TODO: Make this a series of assertions
 
 
     print("######################################")
