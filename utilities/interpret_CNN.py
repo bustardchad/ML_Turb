@@ -72,6 +72,8 @@ def confusion(config, model, data_loader, normalize=None):
     plt.xlabel("Predicted Class",fontsize=20)
     plt.ylabel("True Class",fontsize=20)
 
+    fig.tight_layout()
+
     return fig
 
 
@@ -221,19 +223,30 @@ def plot_saliency(config, model, data_loader, saliency_plot_params):
 
 def plot_occlusion(config, model, data_loader, n_examples, n_classes, label, occ_size=32, occ_stride=32, occ_pixel=0.5):
     # Plot occlusion results
-    n_examples = 6 # number of columns
-    n_classes = 2 # number of rows
+    n_examples = occlusion_plot_params["n_examples"] # number of columns
+    n_classes = occlusion_plot_params["n_classes"] # number of rows / 2
+    labels_to_consider = occlusion_plot_params["labels"]
+    occ_size = occlusion_plot_params["occ_size"]
+    occ_stride = occlusion_plot_params["occ_stride"]
+    figsize = occlusion_plot_params["figsize"]
 
-    fig, axs = plt.subplots(n_classes*2, n_examples, figsize=(16,8))
+    assert (len(labels_to_consider) == 1 or len(labels_to_consider == n_classes)), "have to either consider one label or all labels"
+
+    fig, axs = plt.subplots(n_classes*2, n_examples=n_examples, figsize=figsize)
     ctr = np.zeros(len(config.fileDirArr))
 
     # access a batch of labelled images
     dataiter = iter(data_loader)
     images, labels = next(dataiter)
 
+    # if only one label to consider, do occlusion for just that label (class)
+    if (len(labels_to_consider) == 1):
+        labels_to_consider = labels_to_consider[0]*np.ones(n_classes)
+
     # select n_example example images from each class
     for i in range(0,n_classes):
         images_to_plot = images[labels==i]
+        label = labels_to_consider[i] # calculate prob that image has class = label
         for j in range(0,n_examples):
             plt_image = images_to_plot[j,:,:,:]
 
@@ -251,12 +264,15 @@ def plot_occlusion(config, model, data_loader, n_examples, n_classes, label, occ
 
 
     cols = ['Example {}'.format(col) for col in range(1, n_examples+1)]
-    rows = config.fileDirArr
+    rows = [ [config.fileDirArr[row] , config.fileDirArr[row] ] for row in n_classes]
+    new_rows = []
+    for i in rows:
+        new_rows.extend(i)
 
     for ax, col in zip(axs[0], cols):
         ax.set_title(col)
 
-    for ax, row in zip(axs[:,0], rows):
+    for ax, row in zip(axs[:,0], new_rows):
         ax.set_ylabel(row, rotation=90, size='large')
 
     fig.tight_layout()
