@@ -61,7 +61,7 @@ def confusion(config, model, data_loader, normalize=None):
 
 
     # Build confusion matrix -- updated to include correct normalization (normalize flag)
-    cf_matrix = confusion_matrix(y_true, y_pred, normalize)
+    cf_matrix = confusion_matrix(y_true, y_pred, normalize=normalize)
 
     df_cm = pd.DataFrame(cf_matrix, index = [i for i in classes],
                          columns = [i for i in classes])
