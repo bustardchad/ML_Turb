@@ -24,8 +24,12 @@ import seaborn as sn
 import pandas as pd
 
 
-def confusion(config, model, data_loader):
+def confusion(config, model, data_loader, normalize=None):
     # calculate accuracy and return confusion matrix
+    #
+    # inputs: config file, model, data loader,
+    #         normalize = None,'true','pred','all' -- whether to normalize (see sklearn docs)
+
     classes = config.fileDirArr
 
     correct_pred = {classname: 0 for classname in classes}
@@ -56,10 +60,13 @@ def confusion(config, model, data_loader):
         print(f'Accuracy for class: {classname:5s} is {accuracy:.1f} %')
 
 
-    # Build confusion matrix
-    cf_matrix = confusion_matrix(y_true, y_pred)
-    df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1), index = [i for i in classes],
+    # Build confusion matrix -- updated to include correct normalization (normalize flag)
+    cf_matrix = confusion_matrix(y_true, y_pred, normalize)
+
+    df_cm = pd.DataFrame(cf_matrix, index = [i for i in classes],
                          columns = [i for i in classes])
+    #df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1), index = [i for i in classes],
+    #                     columns = [i for i in classes])
     fig = plt.figure(figsize = (12,7))
     sn.heatmap(df_cm, annot=True)
     plt.xlabel("Predicted Class",fontsize=20)
@@ -164,11 +171,23 @@ def occlusion(model, image, label, occ_size = 50, occ_stride = 50, occ_pixel = 0
     return heatmap
 
 
-def plot_saliency(config, model, data_loader, n_examples = 6, n_classes = 2, levels = [0.6]):
+def plot_saliency(config, model, data_loader, saliency_plot_params):
     # Plots saliency maps for each class, with n_examples per class.
-    # levesl = saliency contours with values from 0 to 1, e.g. levels = [0.4, 0.6]
+    #
+    # Inputs: config, model, data_loader
+    #         saliency_plot_params = dictionary of n_examples, n_classes, levels, and figsize
 
-    fig, axs = plt.subplots(n_classes, n_examples, figsize=(16,8))
+    # Number of examples per class, number of classes
+    n_examples = saliency_plot_params['n_examples']
+    n_classes = saliency_plot_params['n_classes']
+
+    # Levels = saliency contours with values from 0 to 1, e.g. levels = [0.4, 0.6]
+    levels = saliency_plot_params['levels']
+
+    # Size of figure box e.g. (16,12)
+    figsize = saliency_plot_params['figsize']
+
+    fig, axs = plt.subplots(n_classes, n_examples, figsize=(4*n_examples,4*n_classes))
     ctr = np.zeros(len(config.fileDirArr))
 
     # access a batch of labelled images
