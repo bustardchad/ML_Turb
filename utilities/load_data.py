@@ -5,6 +5,7 @@
 #          batch_size = 64
 #          fileDirArr = ['MHD_beta10'] -- file directories
 #          field_list = ['density','magnetic_energy_density'] -- fields to load
+#          projection_depth (default = 1) = depth when images were created by averaging over > 1 cells
 #          data_presplit = True -- flag for whether data has already been split into training, val, test
 #          killPwr = False -- whether we should load data with power spectra flattened or not
 #          run_locally = True -- only set to True if running on my local computer
@@ -96,7 +97,7 @@ class CustomClassifyDataset(Dataset):
 def download_data(config):
     # Download the relevant data from Google Drive
 
-    if (config.run_locally==False):
+    if (config.run_locally==False and config.projection_depth==1):
 
         if ((config.dataset_size == 'small') and (config.killPwr == False)):
             url = "https://drive.google.com/drive/folders/1gSfyMstWIO8BjAoD_6t-a5xDmMd6cfCW"
@@ -108,6 +109,8 @@ def download_data(config):
             raise Exception("Large dataset not loaded to Google Drive yet")
         else:
             raise Warning("Invalid dataset_size or killPwr flag, will default to 'small' and 'false'")
+    elif (config.run_locally==False and config.projection_depth > 1):
+        url = "https://drive.google.com/drive/folders/1Lqjt-N5a_pABI4n5YkGGi3w0N6xVYR6p"
 
 
         #if not os.path.exists("Image_Cubes_noAugment"):
@@ -135,6 +138,16 @@ def plot_data(classes,fileDirArr):
 
     # adding labels
     plt.ylabel('# of images',fontsize = 20)
+    plt.show()
+
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
+
+# show a batch of images
+def batch_imshow(img, title):
+    plt.figure(figsize=(10, 10))
+    plt.title(title)
+    plt.imshow(np.transpose( img.detach().cpu().numpy(), (1, 2, 0)), cmap='gray')
     plt.show()
 
 
@@ -308,6 +321,7 @@ def add_transforms(config, tensors, labels):
 def load_presplit_files(config):
     fileDirArr = config.fileDirArr
     field_list = config.field_list
+    depth = config.projection_depth
     # For a given field...
     # read in npy files under each file directory
     for field in field_list:
@@ -323,6 +337,10 @@ def load_presplit_files(config):
                 filename_train = f"/train_{fileDir}_{field}_large.npy"
                 filename_val = f"/val_{fileDir}_{field}_large.npy"
                 filename_test = f"/test_{fileDir}_{field}_large.npy"
+            elif (config.dataset_size=='small' and depth > 1):
+                filename_train = f"/train_{fileDir}_{field}_depth_{depth}_small.npy"
+                filename_val = f"/val_{fileDir}_{field}_depth_{depth}_small.npy"
+                filename_test = f"/test_{fileDir}_{field}_depth_{depth}_small.npy"
             else:
                 filename_train = f"/train_{fileDir}_{field}_small.npy"
                 filename_val = f"/val_{fileDir}_{field}_small.npy"
@@ -330,7 +348,7 @@ def load_presplit_files(config):
 
             dir = config.path_to_dir
 
-            if config.killPwr: # use images where power spectra are flattened
+            if (config.killPwr): # use images where power spectra are flattened
                 if config.dataset_size=='large':
                     filename_train = f"/train_{fileDir}_{field}_large.npy"
                     filename_val = f"/val_{fileDir}_{field}_large.npy"
@@ -341,6 +359,8 @@ def load_presplit_files(config):
                     filename_test = f"/test_{fileDir}_{field}_small.npy"
 
                 dir = config.path_to_dir
+
+            print(f"Loading training file {filename_train} for classification problem")
 
             x_train = np.load(dir + fileDir + filename_train, mmap_mode='c') # the images
             x_val = np.load(dir + fileDir + filename_val, mmap_mode='c') # the images
@@ -424,6 +444,7 @@ def add_channel(x_full):
 def load_presplit_files_unet(config):
     fileDirArr = config.fileDirArr
     field_list = config.field_list
+    depth = config.projection_depth
 
     # path to files in fileDirArr
     dir = config.path_to_dir
@@ -446,14 +467,24 @@ def load_presplit_files_unet(config):
     lbl = 0
 
     for fileDir in fileDirArr:
-        filename_train0 = f"/train_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
-        filename_val0 = f"/val_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
-        filename_test0 = f"/test_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
+        if depth==1:
+            filename_train0 = f"/train_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
+            filename_val0 = f"/val_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
+            filename_test0 = f"/test_{fileDir}_{field0}_"+str(config.dataset_size)+".npy"
 
-        filename_train1 = f"/train_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
-        filename_val1 = f"/val_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
-        filename_test1 = f"/test_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
+            filename_train1 = f"/train_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
+            filename_val1 = f"/val_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
+            filename_test1 = f"/test_{fileDir}_{field1}_"+str(config.dataset_size)+".npy"
+        else:
+            filename_train0 = f"/train_{fileDir}_{field0}_depth_"+str(depth)+"_"+str(config.dataset_size)+".npy"
+            filename_val0 = f"/val_{fileDir}_{field0}_depth_"+str(depth)+"_"+str(config.dataset_size)+".npy"
+            filename_test0 = f"/test_{fileDir}_{field0}_depth_"+str(depth)+"_"+str(config.dataset_size)+".npy"
 
+            filename_train1 = f"/train_{fileDir}_{field1}_depth_"+str(depth)+"_"+str(config.dataset_size)+".npy"
+            filename_val1 = f"/val_{fileDir}_{field1}_depth_"+str(depth)+"_"+str(config.dataset_size)+".npy"
+            filename_test1 = f"/test_{fileDir}_{field1}_depth_"+str(depth)+"_"+str(config.dataset_size)+".npy"
+
+        print(f"Loading training files {filename_train0} and {filename_train1} for U-net mapping")
 
         x_train = np.load(dir + fileDir + filename_train0, mmap_mode='c') # the images
         x_val = np.load(dir + fileDir + filename_val0, mmap_mode='c') # the images
@@ -546,9 +577,10 @@ def _test_loader_():
     @dataclass
     class TestConfig:
         sim_type = 'unet'
-        batch_size = 64
-        fileDirArr = ['CR_Advect_beta10','CR_Diff_Fiducial_beta10']
-        field_list = ['density','Ec']
+        batch_size = 8
+        fileDirArr = ['MHD_beta10']
+        field_list = ['density','magnetic_energy_density']
+        projection_depth = 1
         data_presplit = True # whether data has already been split into training, val, test
         killPwr = False
         run_locally = True
@@ -573,10 +605,33 @@ def _test_loader_():
     print("...")
     train_dl, valid_dl, test_dl = preprocess(config_test)
 
+    for i, data in enumerate(train_dl):
+        x, y, z = data
+        batch_imshow(make_grid(x, 8), title = 'Sample input batch')
+        batch_imshow(make_grid(y, 8), title = 'Sample target batch')
+        break  # we need just one batch
+
     # print sizes of datasets
     print("Size of training data: ")
     print(len(train_dl.dataset))
     print("...")
+    print("...")
+    print("...")
+    print("...")
+
+
+    config_test.projection_depth = 8
+    # call preprocess with and without transforms
+    print("Loading files for U-net with projection depth = 8")
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+    train_dl, valid_dl, test_dl = preprocess(config_test)
+
+    # print sizes of datasets
+    print("Size of training data: ")
+    print(len(train_dl.dataset))
     print("...")
     print("...")
     print("...")
