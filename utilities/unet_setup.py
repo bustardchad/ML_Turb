@@ -185,16 +185,53 @@ def plot_results(config, model_eval, data_loader, epoch):
             axs[2,i].imshow(target_image,cmap='gray')
 
 
-            cols = ['Example {}'.format(col) for col in range(1, n_examples+1)]
-            rows = ['Input', 'Real Target', 'Modeled Target']
+        cols = ['Example {}'.format(col) for col in range(1, n_examples+1)]
+        rows = ['Input', 'Real Target', 'Modeled Target']
 
-            for ax, col in zip(axs[0], cols):
-                ax.set_title(col)
+        for ax, col in zip(axs[0], cols):
+            ax.set_title(col)
 
-            for ax, row in zip(axs[:,0], rows):
-                ax.set_ylabel(row, rotation=90, size='large')
+        for ax, row in zip(axs[:,0], rows):
+            ax.set_ylabel(row, rotation=90, size='large')
 
-            fig.tight_layout()
-            plt.show()
-            plt.savefig(config.save_dir+config.run_name+'_image_epoch'+str(epoch)+'.png',dpi=600)
-            plt.close()
+        fig.tight_layout()
+        plt.savefig(config.save_dir+config.run_name+'_image_epoch'+str(epoch)+'.png',dpi=600)
+        plt.show()
+        plt.close()
+
+
+# Just a nice helper to show some image batches
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
+
+def batch_imshow(img, title):
+    plt.figure(figsize=(10, 10))
+    plt.title(title)
+    plt.imshow(np.transpose( img.detach().cpu().numpy(), (1, 2, 0)), cmap='gray')
+    plt.show()
+"""
+for i, data in enumerate(train_dl):
+    x, y, z = data  
+    batch_imshow(make_grid(x, 8), title = 'Sample density batch')
+    batch_imshow(make_grid(y, 8), title = 'Sample magnetic energy density batch')
+    break  # we need just one batch
+"""
+
+"""
+# Using PIL
+from PIL import Image
+import torchvision
+
+def show_images(x):
+    x = x * 0.5 + 0.5  # Map from (-1, 1) back to (0, 1)
+    grid = torchvision.utils.make_grid(x)
+    grid_im = grid.detach().cpu().permute(1, 2, 0).clip(0, 1) * 255
+    grid_im = Image.fromarray(np.array(grid_im).astype(np.uint8))
+    return grid_im
+
+for i, data in enumerate(train_dl):
+    x, y, z = data  
+    grid = show_images(x)
+    plt.imshow(grid)
+    break
+"""
