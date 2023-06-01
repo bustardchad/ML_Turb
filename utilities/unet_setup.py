@@ -5,8 +5,6 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 
-from unet import UNet
-
 # Make device agnostic code
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -29,7 +27,7 @@ def _early_stopping(config, model, val_loss):
     if ((np.diff(val_loss[-config.patience:]) <= 0).all()):
       print("Early Stopping")
       return False
-        
+
 def loss_batch(config, loss_func, prediction, yb, opt=None, struc_alpha = 0.2):
     loss = loss_func(prediction, yb)
     if config.use_ssim:
@@ -37,7 +35,7 @@ def loss_batch(config, loss_func, prediction, yb, opt=None, struc_alpha = 0.2):
       loss += struc_loss
     else:
       struc_loss = 0
- 
+
     #print(f"Metrics on batch: {batch_metrics}")
 
     if opt is not None:
@@ -51,7 +49,7 @@ def loss_batch(config, loss_func, prediction, yb, opt=None, struc_alpha = 0.2):
 def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
     # Function that fits (trains) the network
     #
-    # Returns: model, loss arrays for training and validation, 
+    # Returns: model, loss arrays for training and validation,
     #           structural similarity measures for training and validation
     #######################################################################
 
@@ -70,12 +68,12 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
             xb = xb.to(device)
             yb = yb.to(device)
             prediction = model(xb)
-            
-            loss, struc_loss, len = loss_batch(config, loss_func, prediction, 
+
+            loss, struc_loss, len = loss_batch(config, loss_func, prediction,
                                                yb, opt, alpha)
             if config.use_ssim:
               train_struc += -(struc_loss/alpha - 1.0)*len
-            
+
             train_loss += (loss*len)
             num += len
 
@@ -83,7 +81,7 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
         if config.use_ssim:
           train_struc = train_struc/num # average SSIM value (1.0 is best)
 
-        #print(f"current training stats={tracker_train.compute()}") 
+        #print(f"current training stats={tracker_train.compute()}")
 
         model.eval()
         with torch.no_grad():
@@ -99,17 +97,17 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
 
             if config.use_ssim:
               val_struc += -(struc_loss/alpha - 1.0)*len
-            
+
             val_loss += (loss*len)
             num += len
 
         if config.use_ssim:
           val_struc = val_struc/num
-        
-        val_loss = val_loss/num    
 
-        #print(f"current validation stats={tracker_val.compute()}") 
-        
+        val_loss = val_loss/num
+
+        #print(f"current validation stats={tracker_val.compute()}")
+
         loss_arr_train.append(train_loss)
         loss_arr_val.append(val_loss)
 
@@ -127,10 +125,10 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
           plot_results(config, model_for_eval.cpu(), valid_dl, epoch)
           model = model.to(device)
 
-        # early_stopping needs the validation loss to check if it has decreased, 
+        # early_stopping needs the validation loss to check if it has decreased,
         # and if it has, it will make a checkpoint of the current model
         keep_training = _early_stopping(config, model, loss_arr_val)
-        
+
         if ((keep_training==False) and (config.stop_early==True)):
           print("Early Stopping")
           # load the last checkpoint with the best model
@@ -139,27 +137,6 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
 
     return model, loss_arr_train, loss_arr_val, struc_arr_train, struc_arr_val
 
-
-def create_model(config, n_blocks, start_filts, lr, weight_decay):
-    # Creates a Unet with input parameters for # of blocks, starting # of filters,
-    # learning rate, and weight decay rate
-    model = UNet(in_channels=1,
-             out_channels=1,
-             #n_blocks=3,
-             n_blocks=n_blocks,
-             start_filts=start_filts,
-             activation='relu',
-             normalization='batch',
-             conv_mode='same',
-             dim=2).to(device)
-
-    loss_fn = nn.MSELoss() #default reduction='mean'
-
-    opt = torch.optim.AdamW(model.parameters(),
-                                    lr = lr, 
-                                    weight_decay = weight_decay)
-
-    return model, loss_fn, opt
 
 
 def plot_results(config, model_eval, data_loader, epoch):
@@ -183,14 +160,14 @@ def plot_results(config, model_eval, data_loader, epoch):
             # requires a 4D tensor, so need to reshape this 3D one
             image = x.reshape(1, 1, x.shape[1], x.shape[2])
             target = y.reshape(1, 1, y.shape[1], y.shape[2])
-            
+
             target = target.reshape(target.shape[2],target.shape[3])
             target = target.detach().numpy()
 
 
             # we need to find the gradient with respect to the input image, so we need to call requires_grad_  on it
             image.requires_grad_()
-            
+
             # run the model on the image
             outputs = model_eval(image)
 
@@ -202,12 +179,12 @@ def plot_results(config, model_eval, data_loader, epoch):
 
             target_image = outputs.reshape(image.shape[2],image.shape[3])
             target_image = target_image.detach().numpy()
-            
+
             axs[0,i].imshow(input_image,cmap='gray')
             axs[1,i].imshow(target,cmap='gray')
             axs[2,i].imshow(target_image,cmap='gray')
-            
-        
+
+
             cols = ['Example {}'.format(col) for col in range(1, n_examples+1)]
             rows = ['Input', 'Real Target', 'Modeled Target']
 
