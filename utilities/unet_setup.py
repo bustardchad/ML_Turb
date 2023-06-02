@@ -123,8 +123,8 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
         
 
         if config.use_ssim:
-          struc_arr_train.append(train_struc.cpu())
-          struc_arr_val.append(val_struc.cpu())
+          struc_arr_train.append(train_struc)
+          struc_arr_val.append(val_struc)
           df2 = {'Epoch': epoch, 'Train_Loss': train_loss, 'Validation_Loss': val_loss, 
                  'Train_SSIM': train_struc, 'Validation_SSIM': val_struc}
 
