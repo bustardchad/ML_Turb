@@ -135,7 +135,8 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
           print(f"Epoch: {epoch} | Train Loss: {train_loss:.5f}| Validation loss: {val_loss:.5f}")
 
           # add loss (and SSIM info) to text file
-          df.to_csv(f"Loss_{config.run_name}.csv")
+          filename = config.save_dir+"Loss_"+config.run_name+".csv"
+          df.to_csv(filename)
 
           # optionally plot results on validation data every epoch
           model_for_eval = model
@@ -228,7 +229,7 @@ def batch_imshow(img, title):
     plt.show()
 """
 for i, data in enumerate(train_dl):
-    x, y, z = data  
+    x, y, z = data
     batch_imshow(make_grid(x, 8), title = 'Sample density batch')
     batch_imshow(make_grid(y, 8), title = 'Sample magnetic energy density batch')
     break  # we need just one batch
@@ -247,7 +248,7 @@ def show_images(x):
     return grid_im
 
 for i, data in enumerate(train_dl):
-    x, y, z = data  
+    x, y, z = data
     grid = show_images(x)
     plt.imshow(grid)
     break
