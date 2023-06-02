@@ -119,16 +119,17 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
         loss_arr_train.append(train_loss)
         loss_arr_val.append(val_loss)
 
-        df['Epoch'].add(epoch.cpu())
-        df['Train_Loss'].add(train_loss.cpu())
-        df['Validation_Loss'].add(val_loss.cpu())
+        df2 = {'Epoch': epoch, 'Train_Loss': train_loss, 'Validation_Loss': val_loss}
+        
 
         if config.use_ssim:
           struc_arr_train.append(train_struc.cpu())
           struc_arr_val.append(val_struc.cpu())
-          df['Train_SSIM'].add(train_struc.cpu())
-          df['Validation_SSIM'].add(val_struc.cpu())
+          df2 = {'Epoch': epoch, 'Train_Loss': train_loss, 'Validation_Loss': val_loss, 
+                 'Train_SSIM': train_struc, 'Validation_SSIM': val_struc}
 
+        # update dataframe holding losses, ssim info
+        df = df.append(df2, ignore_index = True)
 
         # Print out what's happening every epoch
         if epoch % 1 == 0:
