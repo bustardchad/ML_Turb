@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 # Make device agnostic code
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -52,6 +53,13 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
     # Returns: model, loss arrays for training and validation,
     #           structural similarity measures for training and validation
     #######################################################################
+
+    # text file where I'll write out losses, SSIM, etc.
+    # create a DataFrame - using the data and headers
+    if config.use_ssim:
+       df = pd.DataFrame(columns = ["Epoch", "Train_Loss", "Validation_Loss", "Train_SSIM", "Validation_SSIM"])
+    else:
+       df = pd.DataFrame(columns = ["Epoch", "Train_Loss", "Validation_Loss"])
 
     # arrays to store losses
     loss_arr_train = []
@@ -111,14 +119,23 @@ def fit(config, model, loss_func, opt, train_dl, valid_dl, alpha = 0.2):
         loss_arr_train.append(train_loss)
         loss_arr_val.append(val_loss)
 
+        df['Epoch'].add(epoch)
+        df['Train_Loss'].add(train_loss)
+        df['Validation_Loss'].add(val_loss)
+
         if config.use_ssim:
           struc_arr_train.append(train_struc)
           struc_arr_val.append(val_struc)
+          df['Train_SSIM'].add(train_struc)
+          df['Validation_SSIM'].add(val_struc)
 
 
         # Print out what's happening every epoch
         if epoch % 1 == 0:
           print(f"Epoch: {epoch} | Train Loss: {train_loss:.5f}| Validation loss: {val_loss:.5f}")
+
+          # add loss (and SSIM info) to text file
+          df.to_csv(f"Loss_{config.run_name}.csv")
 
           # optionally plot results on validation data every epoch
           model_for_eval = model
