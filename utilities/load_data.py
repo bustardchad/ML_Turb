@@ -159,11 +159,10 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
     #load the train and validation into batches.
     if (config.hold_out_test_set == True):
         train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 0, pin_memory = True)
-        test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
     else:
         train_dl = DataLoader(ConcatDataset([train_data,test_data]), batch_size, shuffle = True, num_workers = 0, pin_memory = True)
-        test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
 
+    test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
     valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
 
     """
@@ -362,31 +361,37 @@ def load_presplit_files(config):
 
             print(f"Loading training file {filename_train} for classification problem")
 
-            x_train = np.load(dir + fileDir + filename_train, mmap_mode='c') # the images
-            x_val = np.load(dir + fileDir + filename_val, mmap_mode='c') # the images
+            if (config.inference != True):
+                x_train = np.load(dir + fileDir + filename_train, mmap_mode='c') # the images
+                x_val = np.load(dir + fileDir + filename_val, mmap_mode='c') # the images
             x_test = np.load(dir + fileDir + filename_test, mmap_mode='c') # the images
 
-
-            x_train_full, y_train_full = add_labels(x_train, x_train_full, y_train_full, lbl)
-            x_val_full, y_val_full = add_labels(x_val, x_val_full, y_val_full, lbl)
+            if (config.inference != True):
+                x_train_full, y_train_full = add_labels(x_train, x_train_full, y_train_full, lbl)
+                x_val_full, y_val_full = add_labels(x_val, x_val_full, y_val_full, lbl)
             x_test_full, y_test_full = add_labels(x_test, x_test_full, y_test_full, lbl)
 
             lbl+=1
 
     # bit of reformatting
-    img_train_with_channel, labels_train = reformat(x_train_full, y_train_full)
-    img_val_with_channel, labels_val = reformat(x_val_full, y_val_full)
+    if (config.inference != True):
+        img_train_with_channel, labels_train = reformat(x_train_full, y_train_full)
+        img_val_with_channel, labels_val = reformat(x_val_full, y_val_full)
     img_test_with_channel, labels_test = reformat(x_test_full, y_test_full)
 
 
     if (len(field_list) == 1):
-        plot_data(labels_train.numpy(),fileDirArr) # show distribution of data
-        plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
+        if (config.inference != True):
+            plot_data(labels_train.numpy(),fileDirArr) # show distribution of data
+            plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
         plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
 
     # Add transforms (if wanted) and return as Datasets
-    train_full = add_transforms(config, [img_train_with_channel], labels_train)
-    val_full = add_transforms(config, [img_val_with_channel], labels_val)
+    train_full = []
+    val_full = []
+    if (config.inference != True):
+        train_full = add_transforms(config, [img_train_with_channel], labels_train)
+        val_full = add_transforms(config, [img_val_with_channel], labels_val)
     test_full = add_transforms(config, [img_test_with_channel], labels_test)
 
     return train_full, val_full, test_full
@@ -576,7 +581,7 @@ def _test_loader_():
 
     @dataclass
     class TestConfig:
-        sim_type = 'unet'
+        sim_type = 'classify'
         batch_size = 8
         fileDirArr = ['MHD_beta10']
         field_list = ['density','magnetic_energy_density']
