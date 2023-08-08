@@ -156,14 +156,20 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
     # the validation data batch size is twice as large because no backprop is needed
     batch_size=config.batch_size
 
+    # default (if inference ==  True)
+    train_dl = []
+    val_dl = []
+
     #load the train and validation into batches.
-    if (config.hold_out_test_set == True):
-        train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 0, pin_memory = True)
-    else:
-        train_dl = DataLoader(ConcatDataset([train_data,test_data]), batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+
+    if (config.inference != True):
+        if (config.hold_out_test_set == True):
+            train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+        else:
+            train_dl = DataLoader(ConcatDataset([train_data,test_data]), batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+        valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
 
     test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
-    valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
 
     """
     for i, data in enumerate(train_dl):
