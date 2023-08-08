@@ -158,7 +158,7 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
 
     # default (if inference ==  True)
     train_dl = []
-    val_dl = []
+    valid_dl = []
 
     #load the train and validation into batches.
 
