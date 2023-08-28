@@ -342,7 +342,7 @@ def load_presplit_files(config):
                 filename_train = f"/train_{fileDir}_{field}_large.npy"
                 filename_val = f"/val_{fileDir}_{field}_large.npy"
                 filename_test = f"/test_{fileDir}_{field}_large.npy"
-            elif (config.dataset_size=='small' and depth > 1):
+            elif (config.dataset_size=='small' and depth >= 1):
                 filename_train = f"/train_{fileDir}_{field}_depth_{depth}_small.npy"
                 filename_val = f"/val_{fileDir}_{field}_depth_{depth}_small.npy"
                 filename_test = f"/test_{fileDir}_{field}_depth_{depth}_small.npy"
