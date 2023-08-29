@@ -27,11 +27,11 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data.dataloader import DataLoader
-from torch.utils.data import Dataset, ConcatDataset, TensorDataset, random_split
+from torch.utils.data import Dataset, ConcatDataset
 import torchvision.transforms as T
-import pdb
 import os
 import gdown
+import random
 
 
 class CustomUnetDataset(Dataset):
@@ -89,7 +89,7 @@ class CustomClassifyDataset(Dataset):
 
     def __len__(self):
         return self.inputs[0].size(0)
-
+        #return self.len(x
 
 
 
@@ -162,14 +162,21 @@ def create_data_loaders(config,train_data,val_data,test_data,check_representatio
 
     #load the train and validation into batches.
 
+    # Include random sampling with a specified fraction of full_dataset
+    #g_cpu = torch.Generator()
+    #g_cpu.manual_seed(2147483647)
+    #random_sampler_train = RandomSampler(train_data, num_samples=int(len(train_data)*config.data_sample_fraction),generator=g_cpu)
+    #random_sampler_val = RandomSampler(val_data, num_samples=int(len(val_data)*config.data_sample_fraction),generator=g_cpu)
+    #random_sampler_test = RandomSampler(test_data, num_samples=int(len(test_data)*config.data_sample_fraction),generator=g_cpu)
+
     if (config.inference != True):
         if (config.hold_out_test_set == True):
-            train_dl = DataLoader(train_data, batch_size, shuffle = True, num_workers = 0, pin_memory = True)
+            train_dl = DataLoader(train_data, batch_size, num_workers = 0, pin_memory = True, shuffle=True)
         else:
-            train_dl = DataLoader(ConcatDataset([train_data,test_data]), batch_size, shuffle = True, num_workers = 0, pin_memory = True)
-        valid_dl = DataLoader(val_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
+            train_dl = DataLoader(ConcatDataset([train_data,test_data]), batch_size, num_workers = 0, pin_memory = True, shuffle=True)
+        valid_dl = DataLoader(val_data, batch_size*2, num_workers = 0, pin_memory = True, shuffle=True)
 
-    test_dl = DataLoader(test_data, batch_size*2, shuffle = True, num_workers = 0, pin_memory = True)
+    test_dl = DataLoader(test_data, batch_size*2, num_workers = 0, pin_memory = True, shuffle=True)
 
     """
     for i, data in enumerate(train_dl):
@@ -267,17 +274,48 @@ def reformat(x_full, y_full):
 
     return x_with_channel, y_full
 
+def cut_size(config, tensors, labels):
+    # Input: config dataclass, 4D tensors array of shape (num_images, 1, 128, 128), 1D labels array
+    # Output: cut_tensors (4D array) and cut_labels (1D array) that are random subsamples of original inputs
+    #
+    # 
+    num_images = np.shape(tensors)[0]
+    assert num_images >= 1, str(np.shape(tensors))
+
+    assert np.ndim(tensors) == 4, "Shape of tensors is" + str(np.shape(tensors))
+    # indices for random subsample
+    ind_cut = random.sample(range(0,num_images),int(num_images*(config.data_sample_fraction)))
+
+    #my_slices = tuple(slice(x) for x in ind_cut)
+    #tensors = np.array(tensors)
+    cut_tensors = tensors[ind_cut,:,:,:]
+    cut_labels = labels[ind_cut]
+
+    return cut_tensors, cut_labels
 
 def add_transforms(config, tensors, labels):
+    # Input: config, tensors (list containing 1 or more 4D arrays of 1-channel images), labels
+    # Output: full_dataset -- either a CustomUnetDataset or a CustomClassifyDataset
+
+    # Apply random horizontal flips with 100% probability
     horiz = T.Compose([
             T.ToPILImage(),
             T.RandomHorizontalFlip(1.0),
             T.ToTensor()
             ])
 
+    # Apply random vertical flips with 100% probability
     vert = T.Compose([
             T.ToPILImage(),
             T.RandomVerticalFlip(1.0),
+            T.ToTensor()
+            ])
+    
+    # Apply both random horizontal and vertical flips, each with flip_prob probability (default = 0%)
+    horiz_and_vert = T.Compose([
+            T.ToPILImage(),
+            T.RandomVerticalFlip(config.flip_prob or 0),
+            T.RandomHorizontalFlip(config.flip_prob or 0),
             T.ToTensor()
             ])
 
@@ -288,24 +326,28 @@ def add_transforms(config, tensors, labels):
     if config.sim_type=='classify':
         no_transforms = CustomClassifyDataset(tensors,labels,transform=None)
 
-        if config.use_transforms:
+        if (config.use_transforms and config.augment_with_transforms): # augment with flipped images
             horiz_transforms = CustomClassifyDataset(tensors,labels,transform=horiz)
             vert_transforms = CustomClassifyDataset(tensors,labels,transform=vert)
 
             # concatenate the non-transformed and transformed datasets
             full_dataset = torch.utils.data.ConcatDataset([no_transforms, horiz_transforms, vert_transforms])
+        elif (config.use_transforms and config.augment_with_transforms==False):
+            full_dataset = CustomClassifyDataset(tensors,labels,transform=horiz_and_vert)
         else:
             full_dataset = no_transforms
 
     elif config.sim_type=='unet':
         no_transforms = CustomUnetDataset(tensors,labels,transform=None)
 
-        if config.use_transforms:
+        if (config.use_transforms and config.augment_with_transforms): # augment with flipped images
             horiz_transforms = CustomUnetDataset(tensors,labels,transform=horiz)
             vert_transforms = CustomUnetDataset(tensors,labels,transform=vert)
 
             # concatenate the non-transformed and transformed datasets
             full_dataset = torch.utils.data.ConcatDataset([no_transforms, horiz_transforms, vert_transforms])
+        elif (config.use_transforms and config.augment_with_transforms==False):
+            full_dataset = CustomUnetDataset(tensors,labels,transform=horiz_and_vert)
         else:
             full_dataset = no_transforms
 
@@ -315,15 +357,17 @@ def add_transforms(config, tensors, labels):
     return full_dataset
 
 
-# Inputs: fileDirArr -- files.
-#         Options are: MHD_beta1, MHD_beta10, MHD_beta100
-#              CR_Advect_beta10, CR_Diff_Fiducial_beta10, CR_Diff100_beta10
-#         e.g. fileDirArr = ['MHD_beta1','MHD_beta10','MHD_beta100']
-#
-#         field_list -- list of fields
-#         Options are: density, magnetic_energy_density, alfven_speed
-#         e.g. field_list = ['density']
 def load_presplit_files(config):
+    # Inputs: fileDirArr -- files.
+    #         Options are: MHD_beta1, MHD_beta10, MHD_beta100
+    #              CR_Advect_beta10, CR_Diff_Fiducial_beta10, CR_Diff100_beta10
+    #         e.g. fileDirArr = ['MHD_beta1','MHD_beta10','MHD_beta100']
+    #
+    #         field_list -- list of fields
+    #         Options are: density, magnetic_energy_density, alfven_speed
+    #         e.g. field_list = ['density']
+    #
+    #
     fileDirArr = config.fileDirArr
     field_list = config.field_list
     depth = config.projection_depth
@@ -386,19 +430,26 @@ def load_presplit_files(config):
     img_test_with_channel, labels_test = reformat(x_test_full, y_test_full)
 
 
-    if (len(field_list) == 1):
-        if (config.inference != True):
-            plot_data(labels_train.numpy(),fileDirArr) # show distribution of data
-            plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
-        plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
+    #if (len(field_list) == 1):
+    #    if (config.inference != True):
+    #        plot_data(labels_train.numpy(),fileDirArr) # show distribution of data
+    #        plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
+    #    plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
 
     # Add transforms (if wanted) and return as Datasets
     train_full = []
     val_full = []
     if (config.inference != True):
-        train_full = add_transforms(config, [img_train_with_channel], labels_train)
-        val_full = add_transforms(config, [img_val_with_channel], labels_val)
-    test_full = add_transforms(config, [img_test_with_channel], labels_test)
+        # cut image and label sets down to subsets
+        cut_train_images, cut_train_labels = cut_size(config, img_train_with_channel, labels_train)
+        cut_val_images, cut_val_labels = cut_size(config, img_val_with_channel, labels_val)
+
+        # randomly flip (or augment with random flips)
+        train_full = add_transforms(config, [cut_train_images], cut_train_labels)
+        val_full = add_transforms(config, [cut_val_images], cut_val_labels)
+    
+    cut_test_images, cut_test_labels = cut_size(config, img_test_with_channel, labels_test)
+    test_full = add_transforms(config, [cut_test_images], cut_test_labels)
 
     return train_full, val_full, test_full
 
@@ -588,15 +639,19 @@ def _test_loader_():
     @dataclass
     class TestConfig:
         sim_type = 'classify'
+        inference = False
         batch_size = 8
-        fileDirArr = ['MHD_beta10']
-        field_list = ['density','magnetic_energy_density']
+        fileDirArr = ['MHD_beta10_projection']
+        field_list = ['density']
         projection_depth = 1
         data_presplit = True # whether data has already been split into training, val, test
         killPwr = False
         run_locally = True
         run_colab = False
-        use_transforms = False
+        use_transforms = True
+        flip_prob = 0.5
+        augment_with_transforms = False
+        data_sample_fraction = 0.6
         dataset_size = 'small'
         hold_out_test_set = True
         path_to_dir = '../Full_Power/'
@@ -604,53 +659,37 @@ def _test_loader_():
     config_test = TestConfig()
 
 
-    # TODO: Make this a series of assertions
+    # TODO: Make this a series of assertions and github actions
 
 
     print("######################################")
     # call preprocess with and without transforms
-    print("Loading files for U-net without transformations")
+    print("Loading files for {config_test.sim_type} with random transformations")
     print("...")
     print("...")
     print("...")
     print("...")
     train_dl, valid_dl, test_dl = preprocess(config_test)
 
+    """
     for i, data in enumerate(train_dl):
-        x, y, z = data
+        x, y = data
         batch_imshow(make_grid(x, 8), title = 'Sample input batch')
         batch_imshow(make_grid(y, 8), title = 'Sample target batch')
         break  # we need just one batch
-
+    """
     # print sizes of datasets
     print("Size of training data: ")
     print(len(train_dl.dataset))
     print("...")
-    print("...")
-    print("...")
-    print("...")
-
-
-    config_test.projection_depth = 8
-    # call preprocess with and without transforms
-    print("Loading files for U-net with projection depth = 8")
-    print("...")
-    print("...")
-    print("...")
-    print("...")
-    train_dl, valid_dl, test_dl = preprocess(config_test)
-
-    # print sizes of datasets
-    print("Size of training data: ")
-    print(len(train_dl.dataset))
     print("...")
     print("...")
     print("...")
 
     ####################
-    config_test.hold_out_test_set = True
+    config_test.data_sample_fraction = 1.0
     # call preprocess with and without transforms
-    print("Loading files for U-net with test set held out of training set")
+    print("Loading files for {config_test.sim_type} with sample fraction = {config_test.data_sample_fraction} ")
     print("...")
     print("...")
     print("...")
@@ -666,7 +705,7 @@ def _test_loader_():
 
     #########################3
     config_test.use_transforms = True
-    print("Loading files for U-net WITH transformations")
+    print("Loading files for {config_test.sim_type} WITH transformations")
     print("...")
     print("...")
     print("...")
@@ -687,7 +726,7 @@ def _test_loader_():
     config_test.use_transforms = False
 
     # call preprocess with and without transforms
-    print("Loading files for classification without transformations")
+    print("Loading files for {config_test.sim_type} without transformations")
     print("...")
     print("...")
     print("...")
@@ -702,8 +741,8 @@ def _test_loader_():
     print("...")
     print("...")
 
-    config_test.use_transforms = True
-    print("Loading files for classification WITH transformations")
+    config_test.augment_with_transforms = True
+    print("Loading files for {config_test.sim_type} WITH transformations")
     print("...")
     print("...")
     print("...")
