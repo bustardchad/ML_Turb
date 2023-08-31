@@ -32,7 +32,7 @@ import torchvision.transforms as T
 import os
 import gdown
 import random
-
+from memory_profiler import profile
 
 class CustomUnetDataset(Dataset):
     """TensorDataset that supports transforms for both input and target images
@@ -151,6 +151,7 @@ def batch_imshow(img, title):
     plt.show()
 
 
+#@profile
 def create_data_loaders(config,train_data,val_data,test_data,check_representation=False):
     # load batches of training and validation data
     # the validation data batch size is twice as large because no backprop is needed
@@ -274,24 +275,28 @@ def reformat(x_full, y_full):
 
     return x_with_channel, y_full
 
-def cut_size(config, tensors, labels):
-    # Input: config dataclass, 4D tensors array of shape (num_images, 1, 128, 128), 1D labels array
-    # Output: cut_tensors (4D array) and cut_labels (1D array) that are random subsamples of original inputs
+
+#def cut_size(config, tensors, labels):
+def cut_size(config, tensors):
+    # Input: config dataclass, 3D tensors array of shape (num_images, 128, 128), 1D labels array
+    # Output: cut_tensors (3D array) that are random subsamples of original inputs
     #
     # 
-    num_images = np.shape(tensors)[0]
-    assert num_images >= 1, str(np.shape(tensors))
+    num_images = np.shape(tensors)[-1]
+    assert num_images > 128, str(np.shape(tensors))
 
-    assert np.ndim(tensors) == 4, "Shape of tensors is" + str(np.shape(tensors))
+    assert np.ndim(tensors) == 3, "Shape of tensors is" + str(np.shape(tensors))
     # indices for random subsample
     ind_cut = random.sample(range(0,num_images),int(num_images*(config.data_sample_fraction)))
 
     #my_slices = tuple(slice(x) for x in ind_cut)
     #tensors = np.array(tensors)
-    cut_tensors = tensors[ind_cut,:,:,:]
-    cut_labels = labels[ind_cut]
+    cut_tensors = tensors[:,:,ind_cut]
+    #cut_labels = labels[ind_cut]
 
-    return cut_tensors, cut_labels
+    return cut_tensors
+    #return cut_tensors, cut_labels
+
 
 def add_transforms(config, tensors, labels):
     # Input: config, tensors (list containing 1 or more 4D arrays of 1-channel images), labels
@@ -356,7 +361,7 @@ def add_transforms(config, tensors, labels):
 
     return full_dataset
 
-
+#@profile
 def load_presplit_files(config):
     # Inputs: fileDirArr -- files.
     #         Options are: MHD_beta1, MHD_beta10, MHD_beta100
@@ -416,10 +421,22 @@ def load_presplit_files(config):
                 x_val = np.load(dir + fileDir + filename_val, mmap_mode='c') # the images
             x_test = np.load(dir + fileDir + filename_test, mmap_mode='c') # the images
 
+            # cut to fraction of dataset we want to train on
+            x_train = cut_size(config,x_train)
+            x_val = cut_size(config,x_val)
+            x_test = cut_size(config,x_test)
+
             if (config.inference != True):
                 x_train_full, y_train_full = add_labels(x_train, x_train_full, y_train_full, lbl)
+
+                del x_train # explicity clear x_train from memory
                 x_val_full, y_val_full = add_labels(x_val, x_val_full, y_val_full, lbl)
+                
+                del x_val
+
             x_test_full, y_test_full = add_labels(x_test, x_test_full, y_test_full, lbl)
+                
+            del x_test
 
             lbl+=1
 
@@ -441,15 +458,15 @@ def load_presplit_files(config):
     val_full = []
     if (config.inference != True):
         # cut image and label sets down to subsets
-        cut_train_images, cut_train_labels = cut_size(config, img_train_with_channel, labels_train)
-        cut_val_images, cut_val_labels = cut_size(config, img_val_with_channel, labels_val)
+        #cut_train_images, cut_train_labels = cut_size(config, img_train_with_channel, labels_train)
+        #cut_val_images, cut_val_labels = cut_size(config, img_val_with_channel, labels_val)
 
         # randomly flip (or augment with random flips)
-        train_full = add_transforms(config, [cut_train_images], cut_train_labels)
-        val_full = add_transforms(config, [cut_val_images], cut_val_labels)
+        train_full = add_transforms(config, [img_train_with_channel], labels_train)
+        val_full = add_transforms(config, [img_val_with_channel], labels_val)
     
-    cut_test_images, cut_test_labels = cut_size(config, img_test_with_channel, labels_test)
-    test_full = add_transforms(config, [cut_test_images], cut_test_labels)
+    #cut_test_images, cut_test_labels = cut_size(config, img_test_with_channel, labels_test)
+    test_full = add_transforms(config, [img_test_with_channel], labels_test)
 
     return train_full, val_full, test_full
 
@@ -612,6 +629,7 @@ def load_presplit_files_unet(config):
 
 # loads files assuming they are pre-split into training, validation, and test sets
 # returns DataTensors for each split
+# @profile
 def preprocess(config):
     if (config.sim_type=='classify'):
         train_data, val_data, test_data = load_presplit_files(config)
@@ -633,6 +651,44 @@ def preprocess(config):
 
 # For unit testing #
 from dataclasses import dataclass
+import sys
+
+def _test_loader_memory_():
+
+    @dataclass
+    class TestConfig:
+        sim_type = 'classify'
+        inference = False
+        batch_size = 64
+        fileDirArr = ['MHD_beta10_projection']
+        field_list = ['density']
+        projection_depth = 1
+        data_presplit = True # whether data has already been split into training, val, test
+        killPwr = False
+        run_locally = True
+        run_colab = False
+        use_transforms = True
+        flip_prob = 0.5
+        augment_with_transforms = False
+        data_sample_fraction = 0.5
+        dataset_size = 'small'
+        hold_out_test_set = True
+        path_to_dir = '../Full_Power/'
+
+    config_test = TestConfig()
+
+
+    # TODO: Make this a series of assertions and github actions
+
+
+    print("######################################")
+    # call preprocess with and without transforms
+    print("Loading files for {config_test.sim_type} with random transformations")
+    print("...")
+    print("...")
+    print("...")
+    print("...")
+    train_dl, valid_dl, test_dl = preprocess(config_test)
 
 def _test_loader_():
 
