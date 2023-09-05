@@ -402,18 +402,6 @@ def load_presplit_files(config):
 
             dir = config.path_to_dir
 
-            if (config.killPwr): # use images where power spectra are flattened
-                if config.dataset_size=='large':
-                    filename_train = f"/train_{fileDir}_{field}_large.npy"
-                    filename_val = f"/val_{fileDir}_{field}_large.npy"
-                    filename_test = f"/test_{fileDir}_{field}_large.npy"
-                else:
-                    filename_train = f"/train_{fileDir}_{field}_small.npy"
-                    filename_val = f"/val_{fileDir}_{field}_small.npy"
-                    filename_test = f"/test_{fileDir}_{field}_small.npy"
-
-                dir = config.path_to_dir
-
             print(f"Loading training file {filename_train} for classification problem")
 
             if (config.inference != True):
@@ -447,11 +435,11 @@ def load_presplit_files(config):
     img_test_with_channel, labels_test = reformat(x_test_full, y_test_full)
 
 
-    #if (len(field_list) == 1):
-    #    if (config.inference != True):
-    #        plot_data(labels_train.numpy(),fileDirArr) # show distribution of data
-    #        plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
-    #    plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
+    if (len(field_list) == 1):
+        if (config.inference != True):
+            plot_data(labels_train.numpy(),fileDirArr) # show distribution of data
+            plot_data(labels_val.numpy(),fileDirArr) # show distribution of data
+        plot_data(labels_test.numpy(),fileDirArr) # show distribution of data
 
     # Add transforms (if wanted) and return as Datasets
     train_full = []
@@ -683,7 +671,7 @@ def _test_loader_memory_():
 
     print("######################################")
     # call preprocess with and without transforms
-    print("Loading files for {config_test.sim_type} with random transformations")
+    print(f"Loading files for {config_test.sim_type} with random transformations")
     print("...")
     print("...")
     print("...")
@@ -720,7 +708,7 @@ def _test_loader_():
 
     print("######################################")
     # call preprocess with and without transforms
-    print("Loading files for {config_test.sim_type} with random transformations")
+    print(f"Loading files for {config_test.sim_type} with random transformations")
     print("...")
     print("...")
     print("...")
@@ -745,7 +733,7 @@ def _test_loader_():
     ####################
     config_test.data_sample_fraction = 1.0
     # call preprocess with and without transforms
-    print("Loading files for {config_test.sim_type} with sample fraction = {config_test.data_sample_fraction} ")
+    print(f"Loading files for {config_test.sim_type} with sample fraction = {config_test.data_sample_fraction} ")
     print("...")
     print("...")
     print("...")
@@ -761,7 +749,7 @@ def _test_loader_():
 
     #########################3
     config_test.use_transforms = True
-    print("Loading files for {config_test.sim_type} WITH transformations")
+    print(f"Loading files for {config_test.sim_type} WITH transformations")
     print("...")
     print("...")
     print("...")
@@ -782,7 +770,7 @@ def _test_loader_():
     config_test.use_transforms = False
 
     # call preprocess with and without transforms
-    print("Loading files for {config_test.sim_type} without transformations")
+    print(f"Loading files for {config_test.sim_type} without transformations")
     print("...")
     print("...")
     print("...")
@@ -798,7 +786,7 @@ def _test_loader_():
     print("...")
 
     config_test.augment_with_transforms = True
-    print("Loading files for {config_test.sim_type} WITH transformations")
+    print(f"Loading files for {config_test.sim_type} WITH transformations")
     print("...")
     print("...")
     print("...")
