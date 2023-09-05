@@ -213,7 +213,7 @@ def plot_saliency(config, model, data_loader, saliency_plot_params):
         ax.set_title(col,color="k",pad=6.0,size='x-large',fontweight='semibold')
 
     for ax, row in zip(axs[:,0], rows):
-        ax.set_ylabel(row, rotation=90, size='xx-large')
+        ax.set_ylabel(row, rotation=90, size='x-large', fontweight='semibold')
 
     #for ax, col in zip(axs[0], cols):
     #    ax.set_title(col)
