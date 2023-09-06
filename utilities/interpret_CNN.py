@@ -24,13 +24,16 @@ import seaborn as sn
 import pandas as pd
 
 
-def confusion(config, model, data_loader, normalize=None):
+def confusion(config, model, data_loader, confusion_plot_params = None, normalize=None):
     # calculate accuracy and return confusion matrix
     #
     # inputs: config file, model, data loader,
     #         normalize = None,'true','pred','all' -- whether to normalize (see sklearn docs)
 
-    classes = config.fileDirArr
+    if confusion_plot_params['classnames']:
+        classes = confusion_plot_params['classnames']
+    else:
+        classes = config.fileDirArr
 
     correct_pred = {classname: 0 for classname in classes}
     total_pred = {classname: 0 for classname in classes}
@@ -207,13 +210,18 @@ def plot_saliency(config, model, data_loader, saliency_plot_params):
             axs[i,j].contour(filtered_saliency,cmap='plasma_r', levels=levels, linewidths = 2)
 
     cols = ['Example {}'.format(col) for col in range(1, n_examples+1)]
-    rows = config.fileDirArr
+    #rows = config.fileDirArr
+    if saliency_plot_params['classnames']:
+        rows = saliency_plot_params['classnames']
+    else:
+        rows = config.fileDirArr
+
 
     for ax, col in zip(axs[0], cols):
         ax.set_title(col,color="k",pad=6.0,size='x-large',fontweight='semibold')
 
     for ax, row in zip(axs[:,0], rows):
-        ax.set_ylabel(row, rotation=90, size='x-large', fontweight='semibold')
+        ax.set_ylabel(row, rotation=90, size='xx-large', fontweight='semibold')
 
     #for ax, col in zip(axs[0], cols):
     #    ax.set_title(col)
