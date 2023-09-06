@@ -407,11 +407,12 @@ def load_presplit_files(config):
             if (config.inference != True):
                 x_train = np.load(dir + fileDir + filename_train, mmap_mode='c') # the images
                 x_val = np.load(dir + fileDir + filename_val, mmap_mode='c') # the images
+                
+                # cut to fraction of dataset we want to train on
+                x_train = cut_size(config,x_train)
+                x_val = cut_size(config,x_val)
+            
             x_test = np.load(dir + fileDir + filename_test, mmap_mode='c') # the images
-
-            # cut to fraction of dataset we want to train on
-            x_train = cut_size(config,x_train)
-            x_val = cut_size(config,x_val)
             x_test = cut_size(config,x_test)
 
             if (config.inference != True):
@@ -646,7 +647,7 @@ def _test_loader_memory_():
     @dataclass
     class TestConfig:
         sim_type = 'classify'
-        inference = False
+        inference = True
         batch_size = 64
         fileDirArr = ['MHD_beta10_projection']
         field_list = ['density']
