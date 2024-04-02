@@ -1,49 +1,37 @@
 # Deep Learning Cosmic Ray Transport from Density Maps of Simulated, Turbulent Gas
-Jupyter notebooks and other Python scripts that enabled the publication "Deep Learning Cosmic Ray Transport from Density Maps of Simulated, Turbulent Gas" 
-by Chad Bustard and John Wu, published in Machine Learning: Science and Technology, 2024
 
-Paper link: https://iopscience.iop.org/article/10.1088/2632-2153/ad262a
-Blog post: https://bustardchad.github.io/posts/ML_Turb/ML_BlogPost.html
+This repository contains Jupyter notebooks and Python scripts used for the publication "Deep Learning Cosmic Ray Transport from Density Maps of Simulated, Turbulent Gas" by Chad Bustard and John Wu, published in Machine Learning: Science and Technology in 2024.
+
+- Paper link: [Paper on IOPScience](https://iopscience.iop.org/article/10.1088/2632-2153/ad262a)
+- Blog post: [Blog Post](https://bustardchad.github.io/posts/ML_Turb/ML_BlogPost.html)
 
 ## Directory Structure:
 
-#### data_creation
-fromHDF5_to_fits.py -- converts Athena++ snapshots in HDF5 format to FITS files that are then readable and modifiable with astropy
+### data_creation
+- `fromHDF5_to_fits.py`: Converts Athena++ snapshots in HDF5 format to FITS files that are then readable and modifiable with astropy.
+- `create_images_multiple_snapshots.py`: Latest version. From input FITS files, splits each data cube into training, validation, and test sets, separated by spatial buffers. Spatial buffers prevent gas structures from extending from the training set into the validation set, creating correlations between the two.
 
-create_images_multiple_snapshots.py -- most up-to-date version! From input FITS files (../Files/'+fileDir+'/), splits each datacube into 3 chunks, corresponding to train, validation, and test sets, separated by spatial buffers. The buffers are important; without them, gas structures extend from the train set into the validation set, creating correlations between the two. 
+### utilities
+- `load_data.py`: Functions that help load pre-split data.
+- `interpret_CNN.py`: Functions that help interpret the network output, such as confusion matrices and saliency maps.
+- `unet.py`: Pre-made, open-source file from Elektronn3.
+
+### notebooks
+
+#### Primary:
+- `train_CNN_MHD_vs_CRs.ipynb`: Classification of images by turbulence simulation. Can take in either "large" or "small" datasets and snapshots of regular gas density or flattened power spectra.
+- `Turb_Unet.ipynb`: Maps from gas density to magnetic energy density, cosmic ray energy density using a U-net architecture.
+
+#### Other:
+- `Turb_StableDiffusion.ipynb`: Generates snapshots using stable diffusion.
+- `Turb_Generation_DDIM.ipynb`: Generates snapshots using DDIM.
+- `Gaussian_Filter_MHD.ipynb`: Analyzes how a CNN trained to differentiate MHD-only vs MHD+cosmic ray images classifies MHD images that have been Gaussian smoothed to varying extents.
+
+### models
+- Pre-trained models.
 
 
-Older versions (not recommended):
-create_images.py -- from input FITS file in Files/<sim_name> directory, slices the data cube and creates a dataset of ~32,000 images per snapshot. Outputs the *whole* data cube, not split into training, validation, and test sets
-
-create_images_split.py -- same as above but splits data into training, validation, and test sets that are spatially separated so that correlated structures don't occupy two or more sets
-
-#### utilities
-load_data.py -- functions that help load pre-split data
-
-interpret_CNN.py -- functions that help interpret the network output, e.g. confusion matrices, saliency maps, occlusion experiments
-
-unet.py -- Pre-made, open-source file from Elektronn3
-
-#### notebooks
-
-*Primary*:
-train_CNN_MHD_vs_CRs.ipynb -- Classification of images by turbulence simulation. Can take in either "large" or "small" datasets (depending on whether all slices are included in dataset or just a random subsampling from each of train, validation, and test chunks). Can take in either snapshots of regular gas density or snapshots with power spectra flattened (killPwr flag)
-
-Turb_Unet.ipynb -- Maps from gas density to e.g. magnetic energy density, cosmic ray energy density using a U-net architecture
-
-*Other*:
-Turb_StableDiffusion.ipynb -- generates snapshots using stable diffusion (using Hugging Face Diffusers)
-
-Turb_Generation_DDIM -- generates snapshots using DDIM (using Hugging Face Diffusers)
-
-Gaussian_Filter_MHD.ipynb -- Analyzes how a CNN trained to differentiate MHD-only vs MHD+cosmic ray images classifies MHD images that have been gaussian smoothed to varying extents. This smoothing mocks the effects of cosmic rays, which act as a drag force on fluctuations, effectively smoothing out sharp density features.
-
-#### models
-Pre-trained models
-
-_____________________________________________________
-## Overview
+## Background and Overview
 #### The Problem
 Cosmic rays are the most highly energetic charged particles in the Universe, and despite representing only ~ a billionth of all particles in the Milky Way galaxy, they exert a sizeable influence on surrounding gas. How they influence gas and what effect they have on the overall evolution of galaxies are very active research topics, but unfortunately, many important outcomes depend sensitively on the (uncertain) microscopic interactions between cosmic ray particles and magnetic waves (think scales of order 10^-6 parsecs rather than galactic scales of order 1000s of parsecs). The predominant way to seek the "ground truth" of this cosmic ray propagation is to compile multiwavelength observations probing direct and indirect detections of cosmic rays and run them through phenomenological models of cosmic ray propagation. Despite monumental efforts on this, we still lack a complete understanding of cosmic ray propagation and, therefore, galaxy evolution as a whole. 
 
